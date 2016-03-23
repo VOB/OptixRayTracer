@@ -80,6 +80,8 @@ const int SimpleAnimationScene::WIDTH  = 1024;
 const int SimpleAnimationScene::HEIGHT = 1024;
 
 
+
+
 void SimpleAnimationScene::initScene( InitialCameraData& camera_data )
 {
   // Setup context
@@ -207,9 +209,11 @@ void SimpleAnimationScene::updateGeometry( )
   static float t = 0.0f;
 
   //We don't have to set x and z here in this example
+  //This is where animation of vertices happen. we want to make them soft instead. thats right. make this wobbly cow soft.
   for(unsigned int v = 0; v < numVertices; v++)
   {
-    new_vertices[v].y = m_vertices[v].y + ( sinf( m_vertices[v].x / m_model_scale * 3.0f + t ) * m_model_scale * 0.7f );
+    new_vertices[v].y = m_vertices[v].y + ( sinf( m_vertices[v].x / m_model_scale * 3.0f + t )/4 * m_model_scale * 0.7f );
+	new_vertices[v].z = m_vertices[v].z + (sinf(m_vertices[v].y / m_model_scale * 3.0f + t) / 4 * m_model_scale * 0.7f);
   }
 
   t += 0.1f;
@@ -295,7 +299,10 @@ int main( int argc, char** argv )
     }
   }
   if( filename.empty() ) {
-    filename = std::string( sutilSamplesDir() ) + "/simpleAnimation/cow.obj";
+	  std::string inputt;
+	  printf("Which object? \n");
+	  getline(std::cin, inputt); //will crash if object does not exist
+	  filename = std::string(sutilSamplesDir()) + "/simpleAnimation/" + inputt + ".obj";
   }
 
   if( !GLUTDisplay::isBenchmark() ) printUsageAndExit( argv[0], false );
