@@ -39,6 +39,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
+#include <sys/stat.h>
 
 using namespace optix;
 
@@ -275,6 +276,13 @@ void printUsageAndExit( const std::string& argv0, bool doExit = true )
   if ( doExit ) exit(1);
 }
 
+bool does_file_exist(const std::string& fileName)
+{
+	struct stat buf;
+	return (stat(fileName.c_str(), &buf) == 0);
+}
+
+
 int main( int argc, char** argv ) 
 {
   AccelDescriptor accel_desc;
@@ -298,11 +306,16 @@ int main( int argc, char** argv )
       printUsageAndExit( argv[0] );
     }
   }
-  if( filename.empty() ) {
-	  std::string inputt;
-	  printf("Which object? \n");
-	  getline(std::cin, inputt); //will crash if object does not exist
-	  filename = std::string(sutilSamplesDir()) + "/simpleAnimation/" + inputt + ".obj";
+
+  while( filename.empty() ) {
+	  std::string input;
+	  printf("cow or cognacglass ?\n");
+	  getline(std::cin, input);
+	  filename = std::string(sutilSamplesDir()) + "/simpleAnimation/" + input + ".obj";
+	  if (!does_file_exist(filename)) { 
+		  printf(" File does not exist.\n");
+		  filename.clear();
+	  }
   }
 
   if( !GLUTDisplay::isBenchmark() ) printUsageAndExit( argv[0], false );
