@@ -178,6 +178,7 @@ endfunction()
 ####################
 
 add_subdirectory(simpleAnimation)
+add_subdirectory(optixProject)
 add_subdirectory(sutil)
 ####################
 

@@ -101,7 +101,7 @@ void SimpleAnimationScene::initScene( InitialCameraData& camera_data )
 
   // Lights buffer
   BasicLight lights[] = {
-    { make_float3( 60.0f, 60.0f, 60.0f ), make_float3( 1.0f, 1.0f, 1.0f ), 1 }
+    { make_float3( 0.0f, 0.1f, 0.0f ), make_float3( 1.0f, 1.0f, 1.0f ), 1 }
   };
 
   Buffer light_buffer = m_context->createBuffer(RT_BUFFER_INPUT);
@@ -211,11 +211,11 @@ void SimpleAnimationScene::updateGeometry( )
 
   //We don't have to set x and z here in this example
   //This is where animation of vertices happen. we want to make them soft instead. thats right. make this wobbly cow soft.
-  for(unsigned int v = 0; v < numVertices; v++)
+  /*for(unsigned int v = 0; v < numVertices; v++)
   {
     new_vertices[v].y = m_vertices[v].y + ( sinf( m_vertices[v].x / m_model_scale * 3.0f + t )/4 * m_model_scale * 0.7f );
 	new_vertices[v].z = m_vertices[v].z + (sinf(m_vertices[v].y / m_model_scale * 3.0f + t) / 4 * m_model_scale * 0.7f);
-  }
+  }*/
 
   t += 0.1f;
 
@@ -276,12 +276,12 @@ void printUsageAndExit( const std::string& argv0, bool doExit = true )
   if ( doExit ) exit(1);
 }
 
+//Used in main when checking if a .obj file exists or not.
 bool does_file_exist(const std::string& fileName)
 {
 	struct stat buf;
 	return (stat(fileName.c_str(), &buf) == 0);
 }
-
 
 int main( int argc, char** argv ) 
 {
@@ -309,8 +309,13 @@ int main( int argc, char** argv )
 
   while( filename.empty() ) {
 	  std::string input;
-	  printf("cow or cognacglass ?\n");
-	  getline(std::cin, input);
+	  printf("Choose an object file: ");
+	  try {
+		  getline(std::cin, input);
+	  }
+	  catch (int e) {
+		  exit(1);
+	  }
 	  filename = std::string(sutilSamplesDir()) + "/simpleAnimation/" + input + ".obj";
 	  if (!does_file_exist(filename)) { 
 		  printf(" File does not exist.\n");
