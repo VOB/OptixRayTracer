@@ -101,7 +101,7 @@ void SimpleAnimationScene::initScene( InitialCameraData& camera_data )
 
   // Lights buffer
   BasicLight lights[] = {
-    { make_float3( 0.0f, 0.1f, 0.0f ), make_float3( 1.0f, 1.0f, 1.0f ), 1 }
+    { make_float3( 0.0f, 0.1f, 0.0f ), make_float3( 1.0f, 1.0f, 1.0f ), 1 }   // Move the light here
   };
 
   Buffer light_buffer = m_context->createBuffer(RT_BUFFER_INPUT);
