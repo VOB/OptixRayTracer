@@ -106,7 +106,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 
 	// Lights
 	BasicLight lights[] = {
-		{ make_float3(-5.0f, 60.0f, -16.0f), make_float3(1.0f, 1.0f, 1.0f), 1 }
+		{ make_float3(-5.0f, 50.0f, -16.0f), make_float3(1.0f, 1.0f, 1.0f), 1 }
 	};
 
 	Buffer light_buffer = m_context->createBuffer(RT_BUFFER_INPUT);
