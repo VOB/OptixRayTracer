@@ -694,7 +694,12 @@ void PinholeCamera::rotatePhi(float rotation) {
 	data[15] = 1.0f;
 	Matrix4x4 trans = Matrix4x4(data);
 	const Matrix4x4 final_trans = makeTransform(trans, LookAt);
-	eye = make_float3(final_trans*eye4);
+	float3 newEye = make_float3(final_trans*eye4);
+
+	// Makes sure that the phi-angle doesn't get too close to zero. 
+	if (abs(dot(normalize(newEye-lookat), { 0.0f, 1.0f, 0.0f })) < 0.95f){
+		eye = newEye;
+	}
 	setup();	
 }
 
