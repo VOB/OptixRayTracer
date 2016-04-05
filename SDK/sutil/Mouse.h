@@ -146,11 +146,12 @@ public:
 protected:
 
   // Optional virtual
-  virtual void setup();
+	float3 eye, lookat, up;
+	virtual void setup();
 
   Matrix4x4 makeTransform( const Matrix4x4& trans, TransformCenter transCenter ) const;
-
-  float3 eye, lookat, up;
+  Matrix4x4 makeTransform2(const Matrix4x4& trans, TransformCenter transCenter) const;
+  
   float hfov, vfov;
   float3 lookdir, camera_u, camera_v;
   AspectRatioMode aspectRatioMode;

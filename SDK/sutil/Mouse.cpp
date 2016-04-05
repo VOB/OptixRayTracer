@@ -342,6 +342,10 @@ void Mouse::call_func(int x, int y)
       fov(x, y);
     if (modifier == 0                 && button == GLUT_RIGHT_BUTTON)
       dolly(x, y);
+	if (modifier == GLUT_ACTIVE_SHIFT && button == GLUT_LEFT_BUTTON) {
+//		camera->lookat = make_float3(0.0f, 0.0f, 0.0f);
+//		camera->setup();
+	}
   }
 }
 
@@ -637,6 +641,35 @@ Matrix4x4 PinholeCamera::makeTransform( const Matrix4x4& trans, TransformCenter 
   return final_trans;
 }
 
+Matrix4x4 PinholeCamera::makeTransform2(const Matrix4x4& trans, TransformCenter transCenter) const
+{
+	float3 cen;
+	switch (transCenter) {
+	case LookAt:
+		cen = lookat;
+		break;
+	case Eye:
+		cen = eye;
+		break;
+	case Origin:
+		cen = make_float3(0.0f, 0.0f, 0.0f);
+		break;
+	default:
+		assert(0 && "unknown TransformCenter");
+	}
+
+	Matrix4x4 frame = initWithBasis(
+		make_float3(1.0f, 0.0f, 0.0f),
+		make_float3(0.0f, 1.0f, 0.0f),
+		make_float3(0.0f, 0.0f, 1.0f),
+		cen);
+	Matrix4x4 frame_inv = inverse(frame);
+
+	Matrix4x4 final_trans = frame * trans * frame_inv;
+
+	return final_trans;
+}
+
 void PinholeCamera::transform( const Matrix4x4& trans, TransformCenter transCenter )
 {
 
@@ -663,17 +696,24 @@ void PinholeCamera::rotateTheta(float rotation) {
 		0.0f, 0.0f, 0.0f, 1.0f };
 	float4 eye4 = make_float4(eye);
 	Matrix4x4 trans = Matrix4x4(data);
-	const Matrix4x4 final_trans = makeTransform(trans, LookAt);
-	eye = make_float3(final_trans*eye4);
+	Matrix4x4 trans2 = makeTransform2(trans, LookAt);
+	float3 newEye = make_float3(trans2*eye4);	
+	float3 distvec = eye - lookat;
+	float dist = sqrtf(distvec.x*distvec.x + distvec.y*distvec.y + distvec.z*distvec.z);
+	float3 newDistvec = newEye - lookat;
+	float newDist = sqrtf(newDistvec.x*newDistvec.x + newDistvec.y*newDistvec.y + newDistvec.z*newDistvec.z);
+	if (newDist - dist != 0) {
+		Matrix4x4 trans3 = makeTransform2((dist / newDist)*Matrix4x4::identity(), LookAt);
+		eye4 = make_float4(newEye);
+		eye = make_float3(trans3*eye4);
+	}
 	setup();
 }
 
 void PinholeCamera::rotatePhi(float rotation) {
-	float3 axisToRotateAround = { -lookat.z, 0.0f, lookat.x };
+	rotation = -rotation;
+	float3 axisToRotateAround = { -(eye - lookat).z, 0.0f, (eye - lookat).x };
 	axisToRotateAround = normalize(axisToRotateAround);
-	printf("x: %f\n", axisToRotateAround.x);
-	printf("y: %f\n", axisToRotateAround.y);
-	printf("z: %f\n", axisToRotateAround.z);
 	float4 eye4 = make_float4(eye);
 	float data[16];
 	data[0] = 1 + (1 - cosf(rotation))*(axisToRotateAround.x*axisToRotateAround.x - 1);
@@ -693,14 +733,25 @@ void PinholeCamera::rotatePhi(float rotation) {
 	data[14] = 0.0f;
 	data[15] = 1.0f;
 	Matrix4x4 trans = Matrix4x4(data);
-	const Matrix4x4 final_trans = makeTransform(trans, LookAt);
-	float3 newEye = make_float3(final_trans*eye4);
+	const Matrix4x4 trans2 = makeTransform2(trans, LookAt);
+	float3 newEye = make_float3(trans2*eye4);
+	float3 distvec = eye - lookat;
+	float dist = sqrtf(distvec.x*distvec.x + distvec.y*distvec.y + distvec.z*distvec.z);
+	float3 newDistvec = newEye - lookat;
+	float newDist = sqrtf(newDistvec.x*newDistvec.x + newDistvec.y*newDistvec.y + newDistvec.z*newDistvec.z);
+		
+	if (dist - newDist != 0.0f) {
+		Matrix4x4 trans3 = makeTransform2((dist / newDist)*Matrix4x4::identity(), LookAt);
+		eye4 = make_float4(newEye);
+		newEye = make_float3(trans3*eye4);
+	}
 
 	// Makes sure that the phi-angle doesn't get too close to zero. 
-	if (abs(dot(normalize(newEye-lookat), { 0.0f, 1.0f, 0.0f })) < 0.95f){
+	if (abs(dot(normalize(newEye - lookat), { 0.0f, 1.0f, 0.0f })) < 0.999f){
 		eye = newEye;
 	}
-	setup();	
+	printf("Distance: %f\n", newDist);
+	setup();
 }
 
 //-----------------------------------------------------------------------------
