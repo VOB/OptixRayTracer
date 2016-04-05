@@ -54,6 +54,8 @@ set(sources
   MeshScene.h
   Mouse.cpp
   Mouse.h
+  ObjLoader.h
+  ObjLoader.cpp
   OptiXMesh.cpp
   OptiXMesh.h
   OptiXMeshClasses.h

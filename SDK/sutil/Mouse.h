@@ -139,6 +139,9 @@ public:
   SUTILAPI virtual void translate(float3);
   SUTILAPI virtual void dolly(float);
   SUTILAPI virtual void transform( const Matrix4x4& trans, TransformCenter transCenter = LookAt );
+  SUTILAPI virtual void rotateTheta(float rotation);
+  SUTILAPI virtual void rotatePhi(float rotation);
+
 
 protected:
 
