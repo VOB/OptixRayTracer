@@ -750,7 +750,6 @@ void PinholeCamera::rotatePhi(float rotation) {
 	if (abs(dot(normalize(newEye - lookat), { 0.0f, 1.0f, 0.0f })) < 0.999f){
 		eye = newEye;
 	}
-	printf("Distance: %f\n", newDist);
 	setup();
 }
 
