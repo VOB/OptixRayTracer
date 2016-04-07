@@ -431,18 +431,12 @@ void Mouse::rotate(int x, int y)
 	else if (current_interaction.state == GLUT_MOTION) {
 		float3 from(current_interaction.rotate_from);
 		float3 to = { xpos, ypos, 0.8f };
-		//	float3 fromSphere(projectToSphere(from.x, from.y, 0.8f));
-		//	float3 toSphere(projectToSphere(from.x, to.y, 0.8f));  // The x-coordinate here is the old one because of testing. 
-		//	Matrix4x4 m = rotationMatrix( toSphere, fromSphere);
 		current_interaction.rotate_from = to;
-		//    camera->transform( m ); 
 		camera->rotatePhi(ypos - from.y);
 		camera->rotateTheta(xpos - from.x);
-
 	}
 	current_interaction.last_x = x;
 	current_interaction.last_y = y;
-
 }
 
 void Mouse::track_and_pan(int x, int y)
@@ -459,18 +453,14 @@ void Mouse::look(int x, int y)
 	intPosToFloatPos(x, y, xpos, ypos);
 
 	if (current_interaction.state == GLUT_DOWN) {
-
 		current_interaction.look_from = make_float3(xpos, ypos, 0);
-
 	}
 	else if (current_interaction.state == GLUT_MOTION) {
-
 		const float theta = current_interaction.look_from.x - xpos;
 		Matrix4x4 rot_x = Matrix4x4::rotate(theta, make_float3(0.0f, 1.0f, 0.0f));
 		const float phi = ypos - current_interaction.look_from.y;
 		Matrix4x4 rot_y = Matrix4x4::rotate(phi, make_float3(1.0f, 0.0f, 0.0f));
 		camera->transform(rot_x * rot_y, PinholeCamera::Eye);
-
 		float3 look_to = make_float3(xpos, ypos, 0);
 		current_interaction.look_from = look_to;
 	}
@@ -647,6 +637,7 @@ Matrix4x4 PinholeCamera::makeTransform(const Matrix4x4& trans, TransformCenter t
 	return final_trans;
 }
 
+// This function takes an transformation matrix as input and returns a transformation matrix that performs the transformation as if transcenter was the origin. 
 Matrix4x4 PinholeCamera::makeTransform2(const Matrix4x4& trans, TransformCenter transCenter) const
 {
 	float3 cen;
@@ -701,18 +692,22 @@ void PinholeCamera::rotateTheta(float rotation) {
 		sinf(rotation), 0.0f, cosf(rotation), 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f };
 	float4 eye4 = make_float4(eye);
-	Matrix4x4 trans = Matrix4x4(data);
-	Matrix4x4 trans2 = makeTransform2(trans, LookAt);
-	float3 newEye = make_float3(trans2*eye4);	
+	Matrix4x4 trans = makeTransform2(Matrix4x4(data), LookAt);
+	float3 newEye = make_float3(trans*eye4);
+
+	// Because of a bug causing our program to zoom in, we have added this bit to zoom out again. 
+	// An ugly fix but it works for the time being. 
 	float3 distvec = eye - lookat;
 	float dist = sqrtf(distvec.x*distvec.x + distvec.y*distvec.y + distvec.z*distvec.z);
 	float3 newDistvec = newEye - lookat;
 	float newDist = sqrtf(newDistvec.x*newDistvec.x + newDistvec.y*newDistvec.y + newDistvec.z*newDistvec.z);
 	if (newDist - dist != 0) {
-		Matrix4x4 trans3 = makeTransform2((dist / newDist)*Matrix4x4::identity(), LookAt);
+		Matrix4x4 zoomTransformation = makeTransform2((dist / newDist)*Matrix4x4::identity(), LookAt);
 		eye4 = make_float4(newEye);
-		newEye = make_float3(trans3*eye4);
+		newEye = make_float3(zoomTransformation*eye4);
 	}
+	// The code to fix the zooming ends here. 
+
 	eye = newEye;
 	setup();
 }
@@ -739,9 +734,11 @@ void PinholeCamera::rotatePhi(float rotation) {
 	data[13] = 0.0f;
 	data[14] = 0.0f;
 	data[15] = 1.0f;
-	Matrix4x4 trans = Matrix4x4(data);
-	const Matrix4x4 trans2 = makeTransform2(trans, LookAt);
-	float3 newEye = make_float3(trans2*eye4);
+	const Matrix4x4 trans = makeTransform2(Matrix4x4(data), LookAt);
+	float3 newEye = make_float3(trans*eye4);
+
+	// Because of a bug causing our program to zoom in, we have added this bit to zoom out again. 
+	// An ugly fix but it works for the time being. 
 	float3 distvec = eye - lookat;
 	float dist = sqrtf(distvec.x*distvec.x + distvec.y*distvec.y + distvec.z*distvec.z);
 	float3 newDistvec = newEye - lookat;
@@ -751,8 +748,10 @@ void PinholeCamera::rotatePhi(float rotation) {
 		eye4 = make_float4(newEye);
 		newEye = make_float3(trans3*eye4);
 	}
+	// The code to fix the zooming ends here. 
+
 	// Makes sure that the phi-angle doesn't get too close to zero. 
-	if (abs(dot(normalize(newEye - lookat), { 0.0f, 1.0f, 0.0f })) < 0.999f){
+	if (abs(dot(normalize(newEye - lookat), { 0.0f, 1.0f, 0.0f })) < 0.99f){
 		eye = newEye;
 	}
 	setup();
