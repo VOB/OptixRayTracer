@@ -313,7 +313,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	std::string path = std::string(sutilSamplesDir()) + "/simpleAnimation/cognacglass.obj";
 	std::string path2 = std::string(sutilSamplesDir()) + "/simpleAnimation/cow.obj";
 
-	ObjLoader loader1(path2.c_str(), m_context, geometrygroup, box_matl);
+	ObjLoader loader1(path.c_str(), m_context, geometrygroup, box_matl);
 	loader1.load();
 
 	//ObjLoader loader2(path2.c_str(), m_context, geometrygroup, glass_matl);

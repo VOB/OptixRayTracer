@@ -143,7 +143,6 @@ public:
 
 
 protected:
-
 	// Optional virtual
 	float3 eye, lookat, up;
 	virtual void setup();
