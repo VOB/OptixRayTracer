@@ -669,8 +669,12 @@ void PinholeCamera::rotateTheta(float rotation) {
 }
 
 void PinholeCamera::rotatePhi(float rotation) {
+<<<<<<< HEAD
 	float3 axisToRotateAround = { 1.0f, 0.0f, 1.0f };
 
+=======
+	float3 axisToRotateAround = { -lookat.z, 0.0f, lookat.x };
+>>>>>>> Jonatan
 	axisToRotateAround = normalize(axisToRotateAround);
 	printf("x: %f\n", axisToRotateAround.x);
 	printf("y: %f\n", axisToRotateAround.y);
@@ -695,7 +699,16 @@ void PinholeCamera::rotatePhi(float rotation) {
 	data[15] = 1.0f;
 	Matrix4x4 trans = Matrix4x4(data);
 	const Matrix4x4 final_trans = makeTransform(trans, LookAt);
+<<<<<<< HEAD
 	eye = make_float3(final_trans*eye4);
+=======
+	float3 newEye = make_float3(final_trans*eye4);
+
+	// Makes sure that the phi-angle doesn't get too close to zero. 
+	if (abs(dot(normalize(newEye-lookat), { 0.0f, 1.0f, 0.0f })) < 0.95f){
+		eye = newEye;
+	}
+>>>>>>> Jonatan
 	setup();	
 }
 
