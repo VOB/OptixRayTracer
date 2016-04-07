@@ -698,6 +698,7 @@ void PinholeCamera::rotateTheta(float rotation) {
 	Matrix4x4 trans = Matrix4x4(data);
 	Matrix4x4 trans2 = makeTransform2(trans, LookAt);
 	float3 newEye = make_float3(trans2*eye4);	
+	
 	float3 distvec = eye - lookat;
 	float dist = sqrtf(distvec.x*distvec.x + distvec.y*distvec.y + distvec.z*distvec.z);
 	float3 newDistvec = newEye - lookat;
@@ -705,8 +706,9 @@ void PinholeCamera::rotateTheta(float rotation) {
 	if (newDist - dist != 0) {
 		Matrix4x4 trans3 = makeTransform2((dist / newDist)*Matrix4x4::identity(), LookAt);
 		eye4 = make_float4(newEye);
-		eye = make_float3(trans3*eye4);
+		newEye = make_float3(trans3*eye4);
 	}
+	eye = newEye;
 	setup();
 }
 
@@ -735,6 +737,7 @@ void PinholeCamera::rotatePhi(float rotation) {
 	Matrix4x4 trans = Matrix4x4(data);
 	const Matrix4x4 trans2 = makeTransform2(trans, LookAt);
 	float3 newEye = make_float3(trans2*eye4);
+	
 	float3 distvec = eye - lookat;
 	float dist = sqrtf(distvec.x*distvec.x + distvec.y*distvec.y + distvec.z*distvec.z);
 	float3 newDistvec = newEye - lookat;
@@ -745,7 +748,7 @@ void PinholeCamera::rotatePhi(float rotation) {
 		eye4 = make_float4(newEye);
 		newEye = make_float3(trans3*eye4);
 	}
-
+	
 	// Makes sure that the phi-angle doesn't get too close to zero. 
 	if (abs(dot(normalize(newEye - lookat), { 0.0f, 1.0f, 0.0f })) < 0.999f){
 		eye = newEye;
