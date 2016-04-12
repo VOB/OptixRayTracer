@@ -122,7 +122,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 
 	// Set up camera
 	camera_data = InitialCameraData(make_float3(7.0f, 9.2f, -6.0f), // eye
-		make_float3(0.0f, 4.0f, 0.0f), // lookat
+		make_float3(0.0f, 0.0f, 0.0f), // lookat
 		make_float3(0.0f, 1.0f, 0.0f), // up
 		60.0f);                          // vfov
 
@@ -311,13 +311,34 @@ void OptixProject::createGeometry() //------------------------------------------
 
 	GeometryGroup geometrygroup = m_context->createGeometryGroup();
 	std::string path = std::string(sutilSamplesDir()) + "/simpleAnimation/cognacglass.obj";
-	std::string path2 = std::string(sutilSamplesDir()) + "/simpleAnimation/cow.obj";
+	std::string path2 = std::string(sutilSamplesDir()) + "/simpleAnimation/diningroom.obj";
 
-	ObjLoader loader1(path.c_str(), m_context, geometrygroup, box_matl);
-	loader1.load();
 
-	//ObjLoader loader2(path2.c_str(), m_context, geometrygroup, glass_matl);
-	//loader2.load();
+	OptiXMesh mesh(m_context, geometrygroup, box_matl, m_accel_desc);
+	const float m0[4 * 4] = {
+		0.1f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.1f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.1f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.1f
+	};
+	Matrix4x4 matx0 = Matrix4x4(m0);
+	mesh.setLoadingTransform(matx0);
+	mesh.loadBegin_Geometry(path);
+	mesh.loadFinish_Materials();
+
+
+	OptiXMesh mesh2(m_context, geometrygroup, box_matl, m_accel_desc);
+	const float m1[4 * 4] = {
+		1.0f, 0.0f, 0.0f, 3.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+	Matrix4x4 matx1 = Matrix4x4(m1);
+	mesh2.setLoadingTransform(matx1);
+	mesh2.loadBegin_Geometry(path2);
+	mesh2.loadFinish_Materials();
+
 	
 	m_context["top_object"]->set(geometrygroup);
 	m_context["top_shadower"]->set(geometrygroup);
