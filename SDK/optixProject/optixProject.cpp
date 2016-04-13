@@ -59,11 +59,15 @@ public:
 private:
 	std::string texpath(const std::string& base);
 	void createGeometry();
+	void updateGeometry();
+	void initAnimation();
 
 	unsigned int m_width;
 	unsigned int m_height;
 	std::string   texture_path;
 	std::string  m_ptx_path;
+	GeometryGroup geometrygroup;
+	float3*       m_vertices;
 };
 
 
@@ -165,10 +169,44 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 
 	// Populate scene hierarchy
 	createGeometry();
+	initAnimation();
 
 	// Prepare to run
 	m_context->validate();
 	m_context->compile();
+}
+
+void OptixProject::initAnimation()
+{
+
+	GeometryInstance geometryInstance = geometrygroup->getChild(0);
+	Geometry geometry = geometryInstance->getGeometry();
+
+	/*
+	All that we want to do here is to copy
+	the original vertex positions we get from
+	the OptiXMesh to an array. We use this
+	array to always have access to the
+	original vertex position; the values in the
+	OptiXMesh buffer will be altered per frame.
+	*/
+
+	//Query vertex buffer
+	Buffer vertexBuffer = geometry["vertex_buffer"]->getBuffer();
+
+	//Query number of vertices in the buffer
+	RTsize numVertices;
+	vertexBuffer->getSize(numVertices);
+
+	//Get a pointer to the buffer data
+	float3* original_vertices = (float3*)vertexBuffer->map();
+
+	//Allocate our storage array and copy values
+	m_vertices = new float3[numVertices];
+	memcpy(m_vertices, original_vertices, numVertices * sizeof(float3));
+
+	//Unmap buffer
+	vertexBuffer->unmap();
 }
 
 
@@ -180,6 +218,7 @@ Buffer OptixProject::getOutputBuffer()
 
 void OptixProject::trace(const RayGenCameraData& camera_data)
 {
+	updateGeometry();
 	m_context["eye"]->setFloat(camera_data.eye);
 	m_context["U"]->setFloat(camera_data.U);
 	m_context["V"]->setFloat(camera_data.V);
@@ -193,7 +232,45 @@ void OptixProject::trace(const RayGenCameraData& camera_data)
 		static_cast<unsigned int>(buffer_height));
 }
 
+void OptixProject::updateGeometry() {
+	GeometryInstance test = geometrygroup->getChild(0);
+	Geometry test2 = test->getGeometry();
 
+
+	/*
+	All we want to do here is to add a simple sin(x) offset
+	to the vertices y-position.
+	*/
+
+	Buffer vertexBuffer = test2["vertex_buffer"]->getBuffer();
+	float3* new_vertices = (float3*)vertexBuffer->map();
+
+	RTsize numVertices;
+	vertexBuffer->getSize(numVertices);
+
+	static float t = 0.0f;
+
+	//We don't have to set x and z here in this example
+	for (unsigned int v = 0; v < numVertices; v++)
+	{
+		new_vertices[v].y = m_vertices[v].y + (sinf(m_vertices[v].x / 0.3f * 3.0f + t) * 0.3f * 0.7f);
+	}
+
+	t += 0.1f;
+
+	vertexBuffer->unmap();
+
+	/*
+	Vertices are changed now; we have to tell the
+	corresponding acceleration structure that it
+	has to be rebuilt.
+
+	Mark the accel structure and geometry as dirty.
+	*/
+	test2->markDirty();
+	geometrygroup->getAcceleration()->markDirty();
+	
+}
 void OptixProject::doResize(unsigned int width, unsigned int height)
 {
 	// output buffer handled in SampleScene::resize
@@ -309,7 +386,7 @@ void OptixProject::createGeometry() //------------------------------------------
 		glass_matl["shadow_attenuation"]->setFloat(0.4f, 0.7f, 0.4f);
 	//}
 
-	GeometryGroup geometrygroup = m_context->createGeometryGroup();
+	geometrygroup = m_context->createGeometryGroup();
 	std::string path = std::string(sutilSamplesDir()) + "/simpleAnimation/cognacglass.obj";
 	std::string path2 = std::string(sutilSamplesDir()) + "/simpleAnimation/diningroom.obj";
 
@@ -327,7 +404,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	mesh.loadFinish_Materials();
 
 
-	OptiXMesh mesh2(m_context, geometrygroup, box_matl, m_accel_desc);
+	OptiXMesh mesh2(m_context, geometrygroup, glass_matl, m_accel_desc);
 	const float m1[4 * 4] = {
 		1.0f, 0.0f, 0.0f, 3.0f,
 		0.0f, 1.0f, 0.0f, 0.0f,
@@ -342,6 +419,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	
 	m_context["top_object"]->set(geometrygroup);
 	m_context["top_shadower"]->set(geometrygroup);
+
 }
 
 
@@ -387,7 +465,7 @@ int main(int argc, char** argv)
 	try {
 		OptixProject scene(texture_path);
 		scene.setDimensions(width, height);
-		GLUTDisplay::run(title.str(), &scene);
+		GLUTDisplay::run(title.str(), &scene, GLUTDisplay::CDAnimated);
 	}
 	catch (Exception& e){
 		sutilReportError(e.getErrorString().c_str());
