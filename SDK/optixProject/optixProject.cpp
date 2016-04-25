@@ -68,12 +68,13 @@ private:
 	std::string  m_ptx_path;
 	GeometryGroup geometrygroup;
 	float3*       m_vertices;
+	Material glass_matl;
 };
 
 
 void OptixProject::initScene(InitialCameraData& camera_data)
 {
-	// set up path to ptx file associated with tutorial number
+
 	std::stringstream ss;
 	ss << "cudaFile.cu";
 	m_ptx_path = ptxpath("optixProject", ss.str());
@@ -218,7 +219,18 @@ Buffer OptixProject::getOutputBuffer()
 
 void OptixProject::trace(const RayGenCameraData& camera_data)
 {
+	
+
 	updateGeometry();
+	static float t = 0;
+	float3 oldRefraColor = glass_matl["refraction_color"]->getFloat3();
+	oldRefraColor.x = oldRefraColor.x + sinf(t);
+
+	float3 oldRefleColor = glass_matl["reflection_color"]->getFloat3();
+	oldRefleColor.x = oldRefleColor.x + sinf(t);
+	t = t + 0.1f;
+	glass_matl["refraction_color"]->setFloat(oldRefraColor);
+	glass_matl["reflection_color"]->setFloat(oldRefleColor);
 	m_context["eye"]->setFloat(camera_data.eye);
 	m_context["U"]->setFloat(camera_data.U);
 	m_context["V"]->setFloat(camera_data.V);
@@ -290,18 +302,6 @@ float4 make_plane(float3 n, float3 p)
 
 void OptixProject::createGeometry() //-----------------------------------------------------------------// DO NOT CREATE ANY GEOMETRY, we want to import a scene
 {
-	std::string box_ptx(ptxpath("optixProject", "box.cu"));
-	Program box_bounds = m_context->createProgramFromPTXFile(box_ptx, "box_bounds");
-	Program box_intersect = m_context->createProgramFromPTXFile(box_ptx, "box_intersect");
-	
-	// Create box
-	Geometry box = m_context->createGeometry();
-	box->setPrimitiveCount(1u);
-	box->setBoundingBoxProgram(box_bounds);
-	box->setIntersectionProgram(box_intersect);
-	box["boxmin"]->setFloat(-2.0f, 0.0f, -2.0f);
-	box["boxmax"]->setFloat(2.0f, 7.0f, 2.0f);
-	
 	// Floor geometry
 	std::string pgram_ptx(ptxpath("optixProject", "parallelogram.cu"));
 	Geometry parallelogram = m_context->createGeometry();
@@ -360,7 +360,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	floor_matl["crack_width"]->setFloat(0.02f);
 
 	// Glass material
-	Material glass_matl;	//---------------------------------------------------------------------------------------// ignore glass?
+	
 	//if (chull.get()) {
 		Program glass_ch = m_context->createProgramFromPTXFile(m_ptx_path, "glass_closest_hit_radiance");
 
