@@ -346,10 +346,6 @@ void Mouse::call_func(int x, int y)
 			fov(x, y);
 		if (modifier == 0 && button == GLUT_RIGHT_BUTTON)
 			dolly(x, y);
-		if (modifier == GLUT_ACTIVE_SHIFT && button == GLUT_LEFT_BUTTON) {
-			//		camera->lookat = make_float3(0.0f, 0.0f, 0.0f);
-			//		camera->setup();
-		}
 	}
 }
 

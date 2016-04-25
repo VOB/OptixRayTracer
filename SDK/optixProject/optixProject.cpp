@@ -125,7 +125,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 
 	// Set up camera
 	camera_data = InitialCameraData(make_float3(7.0f, 9.2f, -6.0f), // eye
-		make_float3(0.0f, 4.0f, 0.0f), // lookat
+		make_float3(0.0f, 0.0f, 0.0f), // lookat
 		make_float3(0.0f, 1.0f, 0.0f), // up
 		60.0f);                          // vfov
 
@@ -306,7 +306,7 @@ void OptixProject::createGeometry() //------------------------------------------
     Material floor_matl = m_context->createMaterial();
 	Program floor_ch = m_context->createProgramFromPTXFile(m_ptx_path, "only_shadows_closest_hit_radiance");
 	floor_matl->setClosestHitProgram(0, floor_ch);
-	
+
 	floor_matl->setAnyHitProgram(1, ah);
 
     // ---- Load obj files ----
