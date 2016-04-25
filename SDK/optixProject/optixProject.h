@@ -43,6 +43,7 @@ struct PerRayData_radiance
   float3 result;
   float  importance;
   int depth;
+  uint2 ray_id;
 };
 
 struct PerRayData_shadow

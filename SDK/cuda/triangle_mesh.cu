@@ -43,6 +43,9 @@ rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3, shading_normal, attribute shading_normal, ); 
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 
+rtDeclareVariable(float3, dPdu, attribute dPdu, );
+rtDeclareVariable(float3, dPdv, attribute dPdv, );
+
 RT_PROGRAM void mesh_intersect( int primIdx )
 {
   int3 v_idx = vindex_buffer[primIdx];
@@ -78,7 +81,32 @@ RT_PROGRAM void mesh_intersect( int primIdx )
         float2 t1 = texcoord_buffer[ t_idx.y ];
         float2 t2 = texcoord_buffer[ t_idx.z ];
         texcoord = make_float3( t1*beta + t2*gamma + t0*(1.0f-beta-gamma) );
+
+      
+      // -- Calculate dPdu and dPdv --
+
+      // Compute deltas for triangle partial derivatives
+
+        float du1 = t0.x - t2.x;
+        float du2 = t1.x - t2.x;
+        float dv1 = t0.y - t2.y;
+        float dv2 = t1.y - t2.y;
+        float3 dp1 = p0 - p2;
+        float3 dp2 = p1 - p2;
+        float determinant = du1*dv2 - dv1*du2;
+        if(determinant  == 0.f){
+            // Handle zero determinant for triangle partial derivative matrix
+            dPdu = make_float3(1.f, 0.f, 0.f);
+            dPdv = make_float3(0.f, 1.f, 0.f);
+        } else {
+            float invdet = 1.f / determinant;
+            dPdu = ( dv2 * dp1 - dv1 * dp2) * invdet;
+            dPdv = (-du2 * dp1 + du1 * dp2) * invdet;
+        }
+
       }
+
+      // -----------------------------
 
       rtReportIntersection(material_buffer[primIdx]);
     }

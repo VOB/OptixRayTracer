@@ -1,0 +1,12 @@
+# Blender MTL File: 'Chair_with_cloth.blend'
+# Material Count: 1
+
+newmtl _047Thonet_032chair
+Ns 213.725490
+Ka 0.000000 0.000000 0.000000
+Kd 0.398400 0.398400 0.398400
+Ks 1.000000 1.000000 1.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd C:\Users\Vidar\Downloads\thonet-chair-no-14-free-3d-model\textures\wood_DIFFUSE.jpg

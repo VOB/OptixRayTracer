@@ -1,0 +1,3 @@
+[submodule "SDK/optixProject/cloth-shader"]
+	path = SDK/optixProject/cloth-shader
+	url = git@github.com:vidarn/cloth-shader.git

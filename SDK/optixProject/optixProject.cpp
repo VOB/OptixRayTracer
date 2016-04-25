@@ -28,6 +28,8 @@
 #include <OptiXMesh.h>
 #include <ObjLoader.h>
 
+#include "woven_cloth.h"
+
 using namespace optix;
 
 static float rand_range(float min, float max)
@@ -103,12 +105,13 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	std::string miss_name = "envmap_miss";
 	m_context->setMissProgram(0, m_context->createProgramFromPTXFile(m_ptx_path, miss_name));
 	const float3 default_color = make_float3(1.0f, 1.0f, 1.0f);
-	m_context["envmap"]->setTextureSampler(loadTexture(m_context, texpath("CedarCity.hdr"), default_color));
-	m_context["bg_color"]->setFloat(make_float3(0.3f, 0.55f, 0.85f));
+	m_context["envmap"]->setTextureSampler(loadTexture(m_context, texpath("Photo-studio-with-umbrella.hdr"), default_color));
+	m_context["bg_color"]->setFloat(make_float3(1.f, 1.f, 1.f));
 
 	// Lights
 	BasicLight lights[] = {
-		{ make_float3(-5.0f, 50.0f, -16.0f), make_float3(1.0f, 1.0f, 1.0f), 1 }
+		{ make_float3(-5.0f, 50.0f, -16.0f), make_float3(0.4f, 0.4f, 0.5f), 1 },
+        { make_float3(25.0f, 50.0f, -16.0f), make_float3(0.5f, 0.5f, 0.4f), 1 }
 	};
 
 	Buffer light_buffer = m_context->createBuffer(RT_BUFFER_INPUT);
@@ -246,7 +249,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	parallelogram["anchor"]->setFloat(anchor);
 	
 	// Materials
-	std::string box_chname = "box_closest_hit_radiance";
+	std::string box_chname = "cloth_closest_hit_radiance";
 
 	Material box_matl = m_context->createMaterial();
 	Program box_ch = m_context->createProgramFromPTXFile(m_ptx_path, box_chname);
@@ -254,73 +257,85 @@ void OptixProject::createGeometry() //------------------------------------------
 	
 	Program box_ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
 	box_matl->setAnyHitProgram(1, box_ah);
-	
-	box_matl["Ka"]->setFloat(0.3f, 0.3f, 0.3f);
-	box_matl["Kd"]->setFloat(0.6f, 0.7f, 0.8f);
-	box_matl["Ks"]->setFloat(0.8f, 0.9f, 0.8f);
-	box_matl["phong_exp"]->setFloat(88);
-	box_matl["reflectivity_n"]->setFloat(0.2f, 0.2f, 0.2f);
-	
-	std::string floor_chname = "floor_closest_hit_radiance";
+
+    wcWeaveParameters weave_params;
+    // --- Woven Cloth parameters --
+    char *weave_pattern_filename = "34697.wif";
+	weave_params.uscale = 4.f;
+	weave_params.vscale = 4.f;
+	weave_params.umax   = 0.5f;
+	weave_params.psi    = 0.5f;
+    weave_params.alpha = 0.01f;
+    weave_params.beta = 4.f;
+    weave_params.delta_x = 0.6f;
+    weave_params.intensity_fineness = 0.f;
+    weave_params.yarnvar_amplitude = 1.f;
+    weave_params.yarnvar_xscale = 1.f;
+    weave_params.yarnvar_yscale = 1.f;
+    weave_params.yarnvar_persistance = 1.f;
+    weave_params.yarnvar_octaves = 8.f;
+    float specular_strength = 0.3;
+    // -----------------------------
+
+    std::string weave_pattern_path = texpath(weave_pattern_filename);
+    wcWeavePatternFromFile(&weave_params,weave_pattern_path.c_str());
+    int pattern_size = weave_params.pattern_width*weave_params.pattern_height;
+    box_matl["wc_specular_strength"]->setFloat(specular_strength);
+    box_matl["wc_parameters"]->setUserData(sizeof(wcWeaveParameters),&weave_params);
+    box_matl["wc_pattern"]->setUserData(sizeof(PatternEntry)*pattern_size,weave_params.pattern_entry);
 	
 
-	Material floor_matl = m_context->createMaterial();
-	Program floor_ch = m_context->createProgramFromPTXFile(m_ptx_path, floor_chname);
+	Material chair_matl = m_context->createMaterial();
+	Program chair_ch = m_context->createProgramFromPTXFile(m_ptx_path, "floor_closest_hit_radiance");
+	chair_matl->setClosestHitProgram(0, chair_ch);
+	
+	Program ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
+	chair_matl->setAnyHitProgram(1, ah);
+	
+	chair_matl["Ka"]->setFloat(0.f, 0.f, 0.f);
+	chair_matl["Kd"]->setFloat(.2f, .2f, .2f);
+	chair_matl["Ks"]->setFloat(0.2f, 0.2f, 0.2f);
+	chair_matl["reflectivity"]->setFloat(0.1f, 0.1f, 0.1f);
+	chair_matl["reflectivity_n"]->setFloat(0.01f, 0.01f, 0.01f);
+	chair_matl["phong_exp"]->setFloat(88);
+	chair_matl["tile_v0"]->setFloat(0.25f, 0, .15f);
+	chair_matl["tile_v1"]->setFloat(-.15f, 0, 0.25f);
+	chair_matl["crack_color"]->setFloat(0.1f, 0.1f, 0.1f);
+	chair_matl["crack_width"]->setFloat(0.f);
+
+    Material floor_matl = m_context->createMaterial();
+	Program floor_ch = m_context->createProgramFromPTXFile(m_ptx_path, "only_shadows_closest_hit_radiance");
 	floor_matl->setClosestHitProgram(0, floor_ch);
 	
-	Program floor_ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
-	floor_matl->setAnyHitProgram(1, floor_ah);
+	floor_matl->setAnyHitProgram(1, ah);
+
+    // ---- Load obj files ----
+
+    const char *obj_names[] = {
+        "cloth_on_chair.obj",
+        "chair.obj",
+        "floor.obj",
+    };
+
+    optix::Material obj_materials[] = {
+        box_matl,
+        chair_matl,
+        floor_matl
+    };
+
+    Group root_group = m_context->createGroup();
+    for(int i=0;i<sizeof(obj_names)/sizeof(char*);i++){
+	    GeometryGroup geometrygroup = m_context->createGeometryGroup();
+	    std::string path = texpath(obj_names[i]);
+	    ObjLoader loader(path.c_str(), m_context, geometrygroup, obj_materials[i]);
+	    loader.load();
+        root_group->addChild<GeometryGroup>(geometrygroup);
+    }
+
+    root_group->setAcceleration(m_context->createAcceleration("NoAccel", "NoAccel"));
 	
-	floor_matl["Ka"]->setFloat(0.3f, 0.3f, 0.1f);
-	floor_matl["Kd"]->setFloat(194 / 255.f*.6f, 186 / 255.f*.6f, 151 / 255.f*.6f);
-	floor_matl["Ks"]->setFloat(0.4f, 0.4f, 0.4f);
-	floor_matl["reflectivity"]->setFloat(0.1f, 0.1f, 0.1f);
-	floor_matl["reflectivity_n"]->setFloat(0.05f, 0.05f, 0.05f);
-	floor_matl["phong_exp"]->setFloat(88);
-	floor_matl["tile_v0"]->setFloat(0.25f, 0, .15f);
-	floor_matl["tile_v1"]->setFloat(-.15f, 0, 0.25f);
-	floor_matl["crack_color"]->setFloat(0.1f, 0.1f, 0.1f);
-	floor_matl["crack_width"]->setFloat(0.02f);
-
-	// Glass material
-	Material glass_matl;	//---------------------------------------------------------------------------------------// ignore glass?
-	//if (chull.get()) {
-		Program glass_ch = m_context->createProgramFromPTXFile(m_ptx_path, "glass_closest_hit_radiance");
-
-		std::string glass_ahname = "glass_any_hit_shadow";
-
-		Program glass_ah = m_context->createProgramFromPTXFile(m_ptx_path, glass_ahname);
-		glass_matl = m_context->createMaterial();
-		glass_matl->setClosestHitProgram(0, glass_ch);
-		glass_matl->setAnyHitProgram(1, glass_ah);
-
-		glass_matl["importance_cutoff"]->setFloat(1e-2f);
-		glass_matl["cutoff_color"]->setFloat(0.34f, 0.55f, 0.85f);
-		glass_matl["fresnel_exponent"]->setFloat(3.0f);
-		glass_matl["fresnel_minimum"]->setFloat(0.1f);
-		glass_matl["fresnel_maximum"]->setFloat(1.0f);
-		glass_matl["refraction_index"]->setFloat(1.4f);
-		glass_matl["refraction_color"]->setFloat(1.0f, 1.0f, 1.0f);
-		glass_matl["reflection_color"]->setFloat(1.0f, 1.0f, 1.0f);
-		glass_matl["refraction_maxdepth"]->setInt(100);
-		glass_matl["reflection_maxdepth"]->setInt(100);
-		float3 extinction = make_float3(.80f, .89f, .75f);
-		glass_matl["extinction_constant"]->setFloat(log(extinction.x), log(extinction.y), log(extinction.z));
-		glass_matl["shadow_attenuation"]->setFloat(0.4f, 0.7f, 0.4f);
-	//}
-
-	GeometryGroup geometrygroup = m_context->createGeometryGroup();
-	std::string path = std::string(sutilSamplesDir()) + "/simpleAnimation/cognacglass.obj";
-	std::string path2 = std::string(sutilSamplesDir()) + "/simpleAnimation/cow.obj";
-
-	ObjLoader loader1(path.c_str(), m_context, geometrygroup, box_matl);
-	loader1.load();
-
-	//ObjLoader loader2(path2.c_str(), m_context, geometrygroup, glass_matl);
-	//loader2.load();
-	
-	m_context["top_object"]->set(geometrygroup);
-	m_context["top_shadower"]->set(geometrygroup);
+	m_context["top_object"]->set(root_group);
+	m_context["top_shadower"]->set(root_group);
 }
 
 
