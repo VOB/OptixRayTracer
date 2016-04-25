@@ -61,17 +61,22 @@ public:
 private:
 	std::string texpath(const std::string& base);
 	void createGeometry();
+	void updateGeometry();
+	void initAnimation();
 
 	unsigned int m_width;
 	unsigned int m_height;
 	std::string   texture_path;
 	std::string  m_ptx_path;
+	GeometryGroup geometrygroup;
+	float3*       m_vertices;
+	Material glass_matl;
 };
 
 
 void OptixProject::initScene(InitialCameraData& camera_data)
 {
-	// set up path to ptx file associated with tutorial number
+
 	std::stringstream ss;
 	ss << "cudaFile.cu";
 	m_ptx_path = ptxpath("optixProject", ss.str());
@@ -168,10 +173,44 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 
 	// Populate scene hierarchy
 	createGeometry();
+	initAnimation();
 
 	// Prepare to run
 	m_context->validate();
 	m_context->compile();
+}
+
+void OptixProject::initAnimation()
+{
+
+	GeometryInstance geometryInstance = geometrygroup->getChild(0);
+	Geometry geometry = geometryInstance->getGeometry();
+
+	/*
+	All that we want to do here is to copy
+	the original vertex positions we get from
+	the OptiXMesh to an array. We use this
+	array to always have access to the
+	original vertex position; the values in the
+	OptiXMesh buffer will be altered per frame.
+	*/
+
+	//Query vertex buffer
+	Buffer vertexBuffer = geometry["vertex_buffer"]->getBuffer();
+
+	//Query number of vertices in the buffer
+	RTsize numVertices;
+	vertexBuffer->getSize(numVertices);
+
+	//Get a pointer to the buffer data
+	float3* original_vertices = (float3*)vertexBuffer->map();
+
+	//Allocate our storage array and copy values
+	m_vertices = new float3[numVertices];
+	memcpy(m_vertices, original_vertices, numVertices * sizeof(float3));
+
+	//Unmap buffer
+	vertexBuffer->unmap();
 }
 
 
@@ -183,6 +222,18 @@ Buffer OptixProject::getOutputBuffer()
 
 void OptixProject::trace(const RayGenCameraData& camera_data)
 {
+	
+
+	updateGeometry();
+	static float t = 0;
+	float3 oldRefraColor = glass_matl["refraction_color"]->getFloat3();
+	oldRefraColor.x = oldRefraColor.x + sinf(t);
+
+	float3 oldRefleColor = glass_matl["reflection_color"]->getFloat3();
+	oldRefleColor.x = oldRefleColor.x + sinf(t);
+	t = t + 0.1f;
+	glass_matl["refraction_color"]->setFloat(oldRefraColor);
+	glass_matl["reflection_color"]->setFloat(oldRefleColor);
 	m_context["eye"]->setFloat(camera_data.eye);
 	m_context["U"]->setFloat(camera_data.U);
 	m_context["V"]->setFloat(camera_data.V);
@@ -196,7 +247,45 @@ void OptixProject::trace(const RayGenCameraData& camera_data)
 		static_cast<unsigned int>(buffer_height));
 }
 
+void OptixProject::updateGeometry() {
+	GeometryInstance test = geometrygroup->getChild(0);
+	Geometry test2 = test->getGeometry();
 
+
+	/*
+	All we want to do here is to add a simple sin(x) offset
+	to the vertices y-position.
+	*/
+
+	Buffer vertexBuffer = test2["vertex_buffer"]->getBuffer();
+	float3* new_vertices = (float3*)vertexBuffer->map();
+
+	RTsize numVertices;
+	vertexBuffer->getSize(numVertices);
+
+	static float t = 0.0f;
+
+	//We don't have to set x and z here in this example
+	for (unsigned int v = 0; v < numVertices; v++)
+	{
+		new_vertices[v].y = m_vertices[v].y + (sinf(m_vertices[v].x / 0.3f * 3.0f + t) * 0.3f * 0.7f);
+	}
+
+	t += 0.1f;
+
+	vertexBuffer->unmap();
+
+	/*
+	Vertices are changed now; we have to tell the
+	corresponding acceleration structure that it
+	has to be rebuilt.
+
+	Mark the accel structure and geometry as dirty.
+	*/
+	test2->markDirty();
+	geometrygroup->getAcceleration()->markDirty();
+	
+}
 void OptixProject::doResize(unsigned int width, unsigned int height)
 {
 	// output buffer handled in SampleScene::resize
@@ -214,20 +303,15 @@ float4 make_plane(float3 n, float3 p)
 	return make_float4(n, d);
 }
 
+struct ObjFile
+{
+    const char *filename;
+    optix::Material material;
+    float transform[4*4];
+};
+
 void OptixProject::createGeometry() //-----------------------------------------------------------------// DO NOT CREATE ANY GEOMETRY, we want to import a scene
 {
-	std::string box_ptx(ptxpath("optixProject", "box.cu"));
-	Program box_bounds = m_context->createProgramFromPTXFile(box_ptx, "box_bounds");
-	Program box_intersect = m_context->createProgramFromPTXFile(box_ptx, "box_intersect");
-	
-	// Create box
-	Geometry box = m_context->createGeometry();
-	box->setPrimitiveCount(1u);
-	box->setBoundingBoxProgram(box_bounds);
-	box->setIntersectionProgram(box_intersect);
-	box["boxmin"]->setFloat(-2.0f, 0.0f, -2.0f);
-	box["boxmax"]->setFloat(2.0f, 7.0f, 2.0f);
-	
 	// Floor geometry
 	std::string pgram_ptx(ptxpath("optixProject", "parallelogram.cu"));
 	Geometry parallelogram = m_context->createGeometry();
@@ -249,14 +333,14 @@ void OptixProject::createGeometry() //------------------------------------------
 	parallelogram["anchor"]->setFloat(anchor);
 	
 	// Materials
-	std::string box_chname = "cloth_closest_hit_radiance";
+	std::string cloth_chname = "cloth_closest_hit_radiance";
 
-	Material box_matl = m_context->createMaterial();
-	Program box_ch = m_context->createProgramFromPTXFile(m_ptx_path, box_chname);
-	box_matl->setClosestHitProgram(0, box_ch);
+	Material cloth_matl = m_context->createMaterial();
+	Program cloth_ch = m_context->createProgramFromPTXFile(m_ptx_path, cloth_chname);
+	cloth_matl->setClosestHitProgram(0, cloth_ch);
 	
-	Program box_ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
-	box_matl->setAnyHitProgram(1, box_ah);
+	Program cloth_ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
+	cloth_matl->setAnyHitProgram(1, cloth_ah);
 
     wcWeaveParameters weave_params;
     // --- Woven Cloth parameters --
@@ -280,9 +364,9 @@ void OptixProject::createGeometry() //------------------------------------------
     std::string weave_pattern_path = texpath(weave_pattern_filename);
     wcWeavePatternFromFile(&weave_params,weave_pattern_path.c_str());
     int pattern_size = weave_params.pattern_width*weave_params.pattern_height;
-    box_matl["wc_specular_strength"]->setFloat(specular_strength);
-    box_matl["wc_parameters"]->setUserData(sizeof(wcWeaveParameters),&weave_params);
-    box_matl["wc_pattern"]->setUserData(sizeof(PatternEntry)*pattern_size,weave_params.pattern_entry);
+    cloth_matl["wc_specular_strength"]->setFloat(specular_strength);
+    cloth_matl["wc_parameters"]->setUserData(sizeof(wcWeaveParameters),&weave_params);
+    cloth_matl["wc_pattern"]->setUserData(sizeof(PatternEntry)*pattern_size,weave_params.pattern_entry);
 	
 
 	Material chair_matl = m_context->createMaterial();
@@ -309,33 +393,85 @@ void OptixProject::createGeometry() //------------------------------------------
 
 	floor_matl->setAnyHitProgram(1, ah);
 
-    // ---- Load obj files ----
+	Material box_matl = m_context->createMaterial();
+	Program box_ch = m_context->createProgramFromPTXFile(m_ptx_path, "box_closest_hit_radiance");
+	box_matl->setClosestHitProgram(0, box_ch);
+	
+	Program box_ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
+	box_matl->setAnyHitProgram(1, box_ah);
+	
+	box_matl["Ka"]->setFloat(0.3f, 0.3f, 0.3f);
+	box_matl["Kd"]->setFloat(0.6f, 0.7f, 0.8f);
+	box_matl["Ks"]->setFloat(0.8f, 0.9f, 0.8f);
+	box_matl["phong_exp"]->setFloat(88);
+	box_matl["reflectivity_n"]->setFloat(0.2f, 0.2f, 0.2f);
 
-    const char *obj_names[] = {
-        "cloth_on_chair.obj",
-        "chair.obj",
-        "floor.obj",
+	// Glass material
+	
+	//if (chull.get()) {
+		Program glass_ch = m_context->createProgramFromPTXFile(m_ptx_path, "glass_closest_hit_radiance");
+
+		std::string glass_ahname = "glass_any_hit_shadow";
+
+		Program glass_ah = m_context->createProgramFromPTXFile(m_ptx_path, glass_ahname);
+		glass_matl = m_context->createMaterial();
+		glass_matl->setClosestHitProgram(0, glass_ch);
+		glass_matl->setAnyHitProgram(1, glass_ah);
+
+		glass_matl["importance_cutoff"]->setFloat(1e-2f);
+		glass_matl["cutoff_color"]->setFloat(0.34f, 0.55f, 0.85f);
+		glass_matl["fresnel_exponent"]->setFloat(3.0f);
+		glass_matl["fresnel_minimum"]->setFloat(0.1f);
+		glass_matl["fresnel_maximum"]->setFloat(1.0f);
+		glass_matl["refraction_index"]->setFloat(1.4f);
+		glass_matl["refraction_color"]->setFloat(1.0f, 1.0f, 1.0f);
+		glass_matl["reflection_color"]->setFloat(1.0f, 1.0f, 1.0f);
+		glass_matl["refraction_maxdepth"]->setInt(100);
+		glass_matl["reflection_maxdepth"]->setInt(100);
+		float3 extinction = make_float3(.80f, .89f, .75f);
+		glass_matl["extinction_constant"]->setFloat(log(extinction.x), log(extinction.y), log(extinction.z));
+		glass_matl["shadow_attenuation"]->setFloat(0.4f, 0.7f, 0.4f);
+	//}
+
+	geometrygroup = m_context->createGeometryGroup();
+
+    struct ObjFile objs[] = {
+        {"cognacglass.obj", box_matl, 
+            {0.5f, 0.0f, 0.0f, 0.0f,
+		    0.0f, -0.5f, 0.0f, 12.0f,
+		    0.0f, 0.0f, 0.5f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 0.5f}
+        },
+        {"floor.obj", floor_matl, 
+           {1.0f, 0.0f, 0.0f, 0.0f,
+		    0.0f, 1.0f, 0.0f, 0.0f,
+		    0.0f, 0.0f, 1.0f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 1.0f}
+        },
+        {"chair.obj", chair_matl, 
+           {1.0f, 0.0f, 0.0f, 0.0f,
+		    0.0f, 1.0f, 0.0f, 0.0f,
+		    0.0f, 0.0f, 1.0f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 1.0f}
+        },
+        {"cloth_on_chair.obj", cloth_matl, 
+           {1.0f, 0.0f, 0.0f, 0.0f,
+		    0.0f, 1.0f, 0.0f, 0.0f,
+		    0.0f, 0.0f, 1.0f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 1.0f}
+        },
     };
 
-    optix::Material obj_materials[] = {
-        box_matl,
-        chair_matl,
-        floor_matl
-    };
-
-    Group root_group = m_context->createGroup();
-    for(int i=0;i<sizeof(obj_names)/sizeof(char*);i++){
-	    GeometryGroup geometrygroup = m_context->createGeometryGroup();
-	    std::string path = texpath(obj_names[i]);
-	    ObjLoader loader(path.c_str(), m_context, geometrygroup, obj_materials[i]);
-	    loader.load();
-        root_group->addChild<GeometryGroup>(geometrygroup);
+    for(int i=0;i<sizeof(objs)/sizeof(ObjFile);i++){
+        OptiXMesh mesh(m_context, geometrygroup, objs[i].material, m_accel_desc);
+	    Matrix4x4 matx0 = Matrix4x4(objs[i].transform);
+	    mesh.setLoadingTransform(matx0);
+	    mesh.loadBegin_Geometry(texpath(objs[i].filename));
+	    mesh.loadFinish_Materials();
     }
 
-    root_group->setAcceleration(m_context->createAcceleration("NoAccel", "NoAccel"));
-	
-	m_context["top_object"]->set(root_group);
-	m_context["top_shadower"]->set(root_group);
+	m_context["top_object"]->set(geometrygroup);
+	m_context["top_shadower"]->set(geometrygroup);
 }
 
 
@@ -381,7 +517,7 @@ int main(int argc, char** argv)
 	try {
 		OptixProject scene(texture_path);
 		scene.setDimensions(width, height);
-		GLUTDisplay::run(title.str(), &scene);
+		GLUTDisplay::run(title.str(), &scene, GLUTDisplay::CDAnimated);
 	}
 	catch (Exception& e){
 		sutilReportError(e.getErrorString().c_str());
