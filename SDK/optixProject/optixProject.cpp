@@ -143,6 +143,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	srand(0); // Make sure the pseudo random numbers are the same every run.
 
 	int tex_width = 64;
+
 	int tex_height = 64;
 	int tex_depth = 64;
 	Buffer noiseBuffer = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT, tex_width, tex_height, tex_depth);
@@ -358,7 +359,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	Program ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
 	chair_matl->setAnyHitProgram(1, ah);
 	
-	chair_matl["Ka"]->setFloat(0.f, 0.f, 0.f);
+	chair_matl["Ka"]->setFloat(0.7f, 0.5f, 0.3f);
 	chair_matl["Kd"]->setFloat(.2f, .2f, .2f);
 	chair_matl["Ks"]->setFloat(0.2f, 0.2f, 0.2f);
 	chair_matl["reflectivity"]->setFloat(0.1f, 0.1f, 0.1f);

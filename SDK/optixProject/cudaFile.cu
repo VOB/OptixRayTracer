@@ -1,24 +1,4 @@
 
-/*
-* Copyright (c) 2008 - 2009 NVIDIA Corporation.  All rights reserved.
-*
-* NVIDIA Corporation and its licensors retain all intellectual property and proprietary
-* rights in and to this software, related documentation and any modifications thereto.
-* Any use, reproduction, disclosure or distribution of this software and related
-* documentation without an express license agreement from NVIDIA Corporation is strictly
-* prohibited.
-*
-* TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THIS SOFTWARE IS PROVIDED *AS IS*
-* AND NVIDIA AND ITS SUPPLIERS DISCLAIM ALL WARRANTIES, EITHER EXPRESS OR IMPLIED,
-* INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
-* PARTICULAR PURPOSE.  IN NO EVENT SHALL NVIDIA OR ITS SUPPLIERS BE LIABLE FOR ANY
-* SPECIAL, INCIDENTAL, INDIRECT, OR CONSEQUENTIAL DAMAGES WHATSOEVER (INCLUDING, WITHOUT
-* LIMITATION, DAMAGES FOR LOSS OF BUSINESS PROFITS, BUSINESS INTERRUPTION, LOSS OF
-* BUSINESS INFORMATION, OR ANY OTHER PECUNIARY LOSS) ARISING OUT OF THE USE OF OR
-* INABILITY TO USE THIS SOFTWARE, EVEN IF NVIDIA HAS BEEN ADVISED OF THE POSSIBILITY OF
-* SUCH DAMAGES
-*/
-
 #include "optixProject.h"
 #include <optixu/optixu_aabb.h>
 
@@ -127,13 +107,9 @@ rtDeclareVariable(float3,   reflectivity_n, , );
 rtDeclareVariable(float, metalKa, , ) = 1;
 rtDeclareVariable(float, metalKs, , ) = 1;
 rtDeclareVariable(float, metalroughness, , ) = .1;
-rtDeclareVariable(float, rustKa, , ) = 1;
-rtDeclareVariable(float, rustKd, , ) = 1;
 rtDeclareVariable(float3, rustcolor, , ) = {.437, .084, 0};
 rtDeclareVariable(float3, metalcolor, , ) = {.7, .7, .7};
 rtDeclareVariable(float, txtscale, , ) = .02;
-rtDeclareVariable(float, rusty, , ) = 0.2;
-rtDeclareVariable(float, rustbump, , ) = 0.85;
 #define MAXOCTAVES 6
 
 rtTextureSampler<float, 3> noise_texture;
@@ -231,7 +207,13 @@ RT_PROGRAM void floor_closest_hit_radiance()
     float3 world_shade_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 ffnormal     = faceforward( world_shade_normal, -ray.direction, world_geo_normal );
     float3 color = Ka * ambient_light_color;
-
+	
+	
+	int shadow_samples = 3;
+	float shadow_intensity = 0.3f/(float)shadow_samples;
+	unsigned int num_lights = lights.size();
+	PerRayData_shadow shadow_prd;
+    
     float3 hit_point = ray.origin + t_hit * ray.direction;
 
     float v0 = dot(tile_v0, hit_point);
@@ -251,26 +233,25 @@ RT_PROGRAM void floor_closest_hit_radiance()
         float3 L = normalize(light.pos - hit_point);
         float nDl = dot( ffnormal, L);
 
-        if( nDl > 0.0f ){
-            // cast shadow ray
-            PerRayData_shadow shadow_prd;
-            shadow_prd.attenuation = make_float3(1.0f);
-            float Ldist = length(light.pos - hit_point);
-            optix::Ray shadow_ray( hit_point, L, shadow_ray_type, scene_epsilon, Ldist );
-            rtTrace(top_shadower, shadow_ray, shadow_prd);
-            float3 light_attenuation = shadow_prd.attenuation;
-
-            if( fmaxf(light_attenuation) > 0.0f ){
-                float3 Lc = light.color * light_attenuation;
-                color += local_Kd * nDl * Lc;
-
-                float3 H = normalize(L - ray.direction);
-                float nDh = dot( ffnormal, H );
-                if(nDh > 0)
-                    color += Ks * Lc * pow(nDh, phong_exp);
-            }
-
-        }
+		for(int i=0;i<shadow_samples;i++){
+			float r = 2.f*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
+				(prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
+			float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
+				(prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
+			float phi   = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +2, 
+				(prd_radiance.ray_id.y*shadow_samples +i)*3 +2, 8);
+			float3 offset = make_float3(r*sin(theta)*sin(phi),r*cos(theta)*sin(phi),r*cos(phi));
+			float Ldist = optix::length(light.pos + offset - hit_point);
+			float3 L = optix::normalize(light.pos + offset - hit_point);
+        
+			// cast shadow ray
+			if ( light.casts_shadow ) {
+				shadow_prd.attenuation = make_float3(1.0f);
+				optix::Ray shadow_ray = optix::make_Ray( hit_point, L, shadow_ray_type, scene_epsilon, Ldist );
+				rtTrace(top_shadower, shadow_ray, shadow_prd);
+				color = shadow_prd.attenuation*shadow_intensity*color + (1.f-shadow_intensity)*color;
+			}
+		}
     }
 
     float3 r = schlick(-dot(ffnormal, ray.direction), reflectivity_n);
@@ -286,6 +267,7 @@ RT_PROGRAM void floor_closest_hit_radiance()
         rtTrace(top_object, refl_ray, refl_prd);
         color += r * refl_prd.result;
     }
+
 
     prd_radiance.result = color;
 }
@@ -526,6 +508,11 @@ RT_PROGRAM void cloth_closest_hit_radiance()
     intersection.wo_y = optix::dot(-ray.direction, v_vec);
     intersection.wo_z = optix::dot(-ray.direction, p_normal);
 
+	
+    PerRayData_shadow shadow_prd;
+	int shadow_samples = 3;
+	float shadow_intensity = 0.3f/(float)shadow_samples;
+
     unsigned int num_lights = lights.size();
     for(int i = 0; i < num_lights; ++i) {
         BasicLight light = lights[i];
@@ -537,15 +524,28 @@ RT_PROGRAM void cloth_closest_hit_radiance()
         intersection.wi_y = optix::dot(L, v_vec);
         intersection.wi_z = optix::dot(L, p_normal);
 
-        // cast shadow ray
-        float3 light_attenuation = make_float3(static_cast<float>( nDl > 0.0f ));
-        if ( nDl > 0.0f && light.casts_shadow ) {
-            PerRayData_shadow shadow_prd;
-            shadow_prd.attenuation = make_float3(1.0f);
-            optix::Ray shadow_ray = optix::make_Ray( hit_point, L, shadow_ray_type, scene_epsilon, Ldist );
-            rtTrace(top_shadower, shadow_ray, shadow_prd);
-            light_attenuation = shadow_prd.attenuation;
+        for(int i=0;i<shadow_samples;i++){
+            float r = 2.f*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
+                (prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
+            float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
+                (prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
+            float phi   = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +2, 
+                (prd_radiance.ray_id.y*shadow_samples +i)*3 +2, 8);
+            float3 offset = make_float3(r*sin(theta)*sin(phi),r*cos(theta)*sin(phi),r*cos(phi));
+            float Ldist = optix::length(light.pos + offset - hit_point);
+            float3 L = optix::normalize(light.pos + offset - hit_point);
+        
+            // cast shadow ray
+            if ( light.casts_shadow ) {
+                shadow_prd.attenuation = make_float3(1.0f);
+                optix::Ray shadow_ray = optix::make_Ray( hit_point, L, shadow_ray_type, scene_epsilon, Ldist );
+                rtTrace(top_shadower, shadow_ray, shadow_prd);
+                color = shadow_prd.attenuation*shadow_intensity*color + (1.f-shadow_intensity)*color;
+            }
         }
+
+		
+            float3 light_attenuation = shadow_prd.attenuation;
 
         // If not completely shadowed, light the hit point
         if( fmaxf(light_attenuation) > 0.0f ) {
