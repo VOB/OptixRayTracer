@@ -142,7 +142,7 @@ static __device__ __inline__ float snoise(float3 p)
     return tex3D(noise_texture, p.x, p.y, p.z) * 2 -1;
 }
 
-RT_PROGRAM void box_closest_hit_radiance()
+RT_PROGRAM void metal_closest_hit_radiance()
 {
     float3 world_geo_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 world_shade_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );

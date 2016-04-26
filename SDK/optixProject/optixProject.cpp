@@ -394,18 +394,18 @@ void OptixProject::createGeometry() //------------------------------------------
 
 	floor_matl->setAnyHitProgram(1, ah);
 
-	Material box_matl = m_context->createMaterial();
-	Program box_ch = m_context->createProgramFromPTXFile(m_ptx_path, "box_closest_hit_radiance");
-	box_matl->setClosestHitProgram(0, box_ch);
+	Material metal_matl = m_context->createMaterial();
+	Program metal_ch = m_context->createProgramFromPTXFile(m_ptx_path, "metal_closest_hit_radiance");
+	metal_matl->setClosestHitProgram(0, metal_ch);
 	
-	Program box_ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
-	box_matl->setAnyHitProgram(1, box_ah);
+	Program metal_ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
+	metal_matl->setAnyHitProgram(1, metal_ah);
 	
-	box_matl["Ka"]->setFloat(0.3f, 0.3f, 0.3f);
-	box_matl["Kd"]->setFloat(0.6f, 0.7f, 0.8f);
-	box_matl["Ks"]->setFloat(0.8f, 0.9f, 0.8f);
-	box_matl["phong_exp"]->setFloat(88);
-	box_matl["reflectivity_n"]->setFloat(0.2f, 0.2f, 0.2f);
+	metal_matl["Ka"]->setFloat(0.3f, 0.3f, 0.3f);
+	metal_matl["Kd"]->setFloat(0.6f, 0.7f, 0.8f);
+	metal_matl["Ks"]->setFloat(0.8f, 0.9f, 0.8f);
+	metal_matl["phong_exp"]->setFloat(88);
+	metal_matl["reflectivity_n"]->setFloat(0.2f, 0.2f, 0.2f);
 
 	// Glass material
 	
@@ -437,7 +437,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	geometrygroup = m_context->createGeometryGroup();
 
     struct ObjFile objs[] = {
-        {"cognacglass.obj", box_matl, 
+        {"cognacglass.obj", metal_matl, 
             {0.5f, 0.0f, 0.0f, 0.0f,
 		    0.0f, -0.5f, 0.0f, 12.0f,
 		    0.0f, 0.0f, 0.5f, 0.0f,
