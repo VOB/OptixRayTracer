@@ -162,31 +162,14 @@ RT_PROGRAM void box_closest_hit_radiance()
         a *= 0.5f;
     }
 
-    /* Scale the rust appropriately, modulate it by another noise 
-    * computation, then sharpen it by squaring its value.
-    */
-    float rustiness = step (1-rusty, clamp (sum,0.0f,1.0f));
-    rustiness *= clamp (abs(snoise(PP)), 0.0f, .08f) / 0.08f;
-    rustiness *= rustiness;
 
-    /* If we have any rust, calculate the color of the rust, taking into
-    * account the perturbed normal and shading like matte.
-    */
-    float3 Nrust = ffnormal;
-    if (rustiness > 0) {
-        /* If it's rusty, also add a high frequency bumpiness to the normal */
-        Nrust = normalize(ffnormal + rustbump * snoise(PP));
-        Nrust = faceforward (Nrust, -ray.direction, world_geo_normal);
-    }
-
-    float3 color = mix(metalcolor * metalKa, rustcolor * rustKa, rustiness) * ambient_light_color;
+    float3 color = metalcolor * metalKa * ambient_light_color;
     for(int i = 0; i < lights.size(); ++i) {
         BasicLight light = lights[i];
         float3 L = normalize(light.pos - hit_point);
         float nmDl = dot( ffnormal, L);
-        float nrDl = dot( Nrust, L);
 
-        if( nmDl > 0.0f || nrDl > 0.0f ){
+        if( nmDl > 0.0f){
             // cast shadow ray
             PerRayData_shadow shadow_prd;
             shadow_prd.attenuation = make_float3(1.0f);
@@ -197,10 +180,9 @@ RT_PROGRAM void box_closest_hit_radiance()
 
             if( fmaxf(light_attenuation) > 0.0f ){
                 float3 Lc = light.color * light_attenuation;
-                nrDl = max(nrDl * rustiness, 0.0f);
-                color += rustKd * rustcolor * nrDl * Lc;
+                color += Lc;
 
-                float r = nmDl * (1.0f-rustiness);
+                float r = nmDl;
                 if(nmDl > 0.0f){
                     float3 H = normalize(L - ray.direction);
                     float nmDh = dot( ffnormal, H );
@@ -212,7 +194,7 @@ RT_PROGRAM void box_closest_hit_radiance()
         }
     }
 
-    float3 r = schlick(-dot(ffnormal, ray.direction), reflectivity_n * (1-rustiness));
+    float3 r = schlick(-dot(ffnormal, ray.direction), reflectivity_n );
     float importance = prd_radiance.importance * optix::luminance( r );
 
     // reflection ray
@@ -479,7 +461,7 @@ RT_PROGRAM void glass_closest_hit_radiance()
 //
 RT_PROGRAM void exception()
 {
-    output_buffer[launch_index] = make_color( bad_color );
+    //output_buffer[launch_index] = make_color( bad_color );
 }
 
 // ------------- Only Shadows ---------------

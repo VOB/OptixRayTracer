@@ -7,9 +7,9 @@ if(GLUT_FOUND AND OPENGL_FOUND)
   OPTIX_add_sample_executable( optixProject
     optixProject.cpp
 	optixProject.h
+    cloth-shader/src/woven_cloth.h
     cloth-shader/src/woven_cloth.cpp
     cudaFile.cu
-	wovenCloth.cu
 
     # These files are common among multiple samples
     box.cu

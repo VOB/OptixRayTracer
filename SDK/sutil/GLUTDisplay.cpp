@@ -313,6 +313,10 @@ void GLUTDisplay::init( int& argc, char** argv )
     } else if(arg == "-c" || arg == "--cache") {
       m_accel_desc.caching_on = true;
       removeArg(i, argc, argv);
+
+    } else if(arg == "-c" || arg == "--cache") {
+      m_accel_desc.caching_on = true;
+      removeArg(i, argc, argv);
     } else if(arg.substr(0, 3) == "-d=" || arg.substr(0, 6) == "--dim=") {
       std::string arg_value = arg.substr( arg.find_first_of( '=' ) + 1 );
       unsigned int width, height;

@@ -86,7 +86,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context->setEntryPointCount(1);
 	m_context->setStackSize(4640);
 
-	m_context["max_depth"]->setInt(100);
+	m_context["max_depth"]->setInt(16);
 	m_context["radiance_ray_type"]->setUint(0);
 	m_context["shadow_ray_type"]->setUint(1);
 	m_context["frame_number"]->setUint(0u);
@@ -226,14 +226,14 @@ void OptixProject::trace(const RayGenCameraData& camera_data)
 
 	updateGeometry();
 	static float t = 0;
-	float3 oldRefraColor = glass_matl["refraction_color"]->getFloat3();
-	oldRefraColor.x = oldRefraColor.x + sinf(t);
+	/*float3 oldRefraColor = glass_matl["refraction_color"]->getFloat3();
+	//oldRefraColor.x = oldRefraColor.x + sinf(t); //Varies color
 
 	float3 oldRefleColor = glass_matl["reflection_color"]->getFloat3();
-	oldRefleColor.x = oldRefleColor.x + sinf(t);
+	//oldRefleColor.x = oldRefleColor.x + sinf(t); //varies color
 	t = t + 0.1f;
 	glass_matl["refraction_color"]->setFloat(oldRefraColor);
-	glass_matl["reflection_color"]->setFloat(oldRefleColor);
+	glass_matl["reflection_color"]->setFloat(oldRefleColor);*/
 	m_context["eye"]->setFloat(camera_data.eye);
 	m_context["U"]->setFloat(camera_data.U);
 	m_context["V"]->setFloat(camera_data.V);
@@ -267,9 +267,9 @@ void OptixProject::updateGeometry() {
 
 	//We don't have to set x and z here in this example
 	for (unsigned int v = 0; v < numVertices; v++)
-	{
+	/*{
 		new_vertices[v].y = m_vertices[v].y + (sinf(m_vertices[v].x / 0.3f * 3.0f + t) * 0.3f * 0.7f);
-	}
+	}*/
 
 	t += 0.1f;
 
@@ -286,6 +286,7 @@ void OptixProject::updateGeometry() {
 	geometrygroup->getAcceleration()->markDirty();
 	
 }
+
 void OptixProject::doResize(unsigned int width, unsigned int height)
 {
 	// output buffer handled in SampleScene::resize
@@ -515,6 +516,7 @@ int main(int argc, char** argv)
 	std::stringstream title;
 	title << "Nice stuff yo";
 	try {
+		
 		OptixProject scene(texture_path);
 		scene.setDimensions(width, height);
 		GLUTDisplay::run(title.str(), &scene, GLUTDisplay::CDAnimated);
