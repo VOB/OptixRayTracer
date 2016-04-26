@@ -86,7 +86,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context->setEntryPointCount(1);
 	m_context->setStackSize(4640);
 
-	m_context["max_depth"]->setInt(16);
+	m_context["max_depth"]->setInt(124);
 	m_context["radiance_ray_type"]->setUint(0);
 	m_context["shadow_ray_type"]->setUint(1);
 	m_context["frame_number"]->setUint(0u);
@@ -313,25 +313,6 @@ struct ObjFile
 
 void OptixProject::createGeometry() //-----------------------------------------------------------------// DO NOT CREATE ANY GEOMETRY, we want to import a scene
 {
-	// Floor geometry
-	std::string pgram_ptx(ptxpath("optixProject", "parallelogram.cu"));
-	Geometry parallelogram = m_context->createGeometry();
-	parallelogram->setPrimitiveCount(1u);
-	parallelogram->setBoundingBoxProgram(m_context->createProgramFromPTXFile(pgram_ptx, "bounds"));
-	parallelogram->setIntersectionProgram(m_context->createProgramFromPTXFile(pgram_ptx, "intersect"));
-	float3 anchor = make_float3(-64.0f, 0.01f, -64.0f);
-	float3 v1 = make_float3(128.0f, 0.0f, 0.0f);
-	float3 v2 = make_float3(0.0f, 0.0f, 128.0f);
-	float3 normal = cross(v2, v1);
-	normal = normalize(normal);
-	float d = dot(normal, anchor);
-	v1 *= 1.0f / dot(v1, v1);
-	v2 *= 1.0f / dot(v2, v2);
-	float4 plane = make_float4(normal, d);
-	parallelogram["plane"]->setFloat(plane);
-	parallelogram["v1"]->setFloat(v1);
-	parallelogram["v2"]->setFloat(v2);
-	parallelogram["anchor"]->setFloat(anchor);
 	
 	// Materials
 	std::string cloth_chname = "cloth_closest_hit_radiance";
@@ -346,14 +327,14 @@ void OptixProject::createGeometry() //------------------------------------------
     wcWeaveParameters weave_params;
     // --- Woven Cloth parameters --
     char *weave_pattern_filename = "34697.wif";
-	weave_params.uscale = 4.f;
-	weave_params.vscale = 4.f;
+	weave_params.uscale = 15.f;
+	weave_params.vscale = 15.f;
 	weave_params.umax   = 0.5f;
 	weave_params.psi    = 0.5f;
     weave_params.alpha = 0.01f;
     weave_params.beta = 4.f;
-    weave_params.delta_x = 0.6f;
-    weave_params.intensity_fineness = 0.f;
+    weave_params.delta_x = 0.3f;
+    weave_params.intensity_fineness = 16.f;
     weave_params.yarnvar_amplitude = 1.f;
     weave_params.yarnvar_xscale = 1.f;
     weave_params.yarnvar_yscale = 1.f;

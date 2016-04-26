@@ -12,9 +12,7 @@ if(GLUT_FOUND AND OPENGL_FOUND)
     cudaFile.cu
 
     # These files are common among multiple samples
-    box.cu
     commonStructs.h
-    parallelogram.cu    
     )
 else()
   # GLUT or OpenGL not found

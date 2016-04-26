@@ -107,7 +107,7 @@ RT_PROGRAM void any_hit_shadow()
 
 
 //
-// Procedural rusted metal surface shader
+// Procedural metal surface shader
 //
 
 /*
