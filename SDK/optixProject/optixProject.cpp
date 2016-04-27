@@ -353,7 +353,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	
 
 	Material chair_matl = m_context->createMaterial();
-	Program chair_ch = m_context->createProgramFromPTXFile(m_ptx_path, "floor_closest_hit_radiance");
+	Program chair_ch = m_context->createProgramFromPTXFile(m_ptx_path, "chair_closest_hit_radiance");
 	chair_matl->setClosestHitProgram(0, chair_ch);
 	
 	Program ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
@@ -365,10 +365,6 @@ void OptixProject::createGeometry() //------------------------------------------
 	chair_matl["reflectivity"]->setFloat(0.1f, 0.1f, 0.1f);
 	chair_matl["reflectivity_n"]->setFloat(0.01f, 0.01f, 0.01f);
 	chair_matl["phong_exp"]->setFloat(88);
-	chair_matl["tile_v0"]->setFloat(0.25f, 0, .15f);
-	chair_matl["tile_v1"]->setFloat(-.15f, 0, 0.25f);
-	chair_matl["crack_color"]->setFloat(0.1f, 0.1f, 0.1f);
-	chair_matl["crack_width"]->setFloat(0.f);
 
     Material floor_matl = m_context->createMaterial();
 	Program floor_ch = m_context->createProgramFromPTXFile(m_ptx_path, "only_shadows_closest_hit_radiance");
@@ -419,18 +415,28 @@ void OptixProject::createGeometry() //------------------------------------------
 	geometrygroup = m_context->createGeometryGroup();
 
     struct ObjFile objs[] = {
-        {"cognacglass.obj", metal_matl, 
-            {0.5f, 0.0f, 0.0f, 0.0f,
-		    0.0f, -0.5f, 0.0f, 12.0f,
-		    0.0f, 0.0f, 0.5f, 0.0f,
-		    0.0f, 0.0f, 0.0f, 0.5f}
-        },
+		
         {"floor.obj", floor_matl, 
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
         },
+
+		{ "bunny_uv.obj", glass_matl,
+			{ 10.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 10.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 10.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 10.0f }
+		},
+
+		{"cognacglass.obj", metal_matl, 
+            {0.5f, 0.0f, 0.0f, 0.0f,
+		    0.0f, -0.5f, 0.0f, 12.0f,
+		    0.0f, 0.0f, 0.5f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 0.5f}
+        },
+        
         {"chair.obj", chair_matl, 
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
@@ -442,7 +448,7 @@ void OptixProject::createGeometry() //------------------------------------------
 		    0.0f, 1.0f, 0.0f, 0.0f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
-        },
+        }
     };
 
     for(int i=0;i<sizeof(objs)/sizeof(ObjFile);i++){

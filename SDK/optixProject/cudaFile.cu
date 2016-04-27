@@ -107,7 +107,6 @@ rtDeclareVariable(float3,   reflectivity_n, , );
 rtDeclareVariable(float, metalKa, , ) = 1;
 rtDeclareVariable(float, metalKs, , ) = 1;
 rtDeclareVariable(float, metalroughness, , ) = .1;
-rtDeclareVariable(float3, rustcolor, , ) = {.437, .084, 0};
 rtDeclareVariable(float3, metalcolor, , ) = {.7, .7, .7};
 rtDeclareVariable(float, txtscale, , ) = .02;
 #define MAXOCTAVES 6
@@ -193,16 +192,13 @@ RT_PROGRAM void metal_closest_hit_radiance()
 // Uses procedural texture to determine diffuse response.
 //
 rtDeclareVariable(float,  phong_exp, , );
-rtDeclareVariable(float3, tile_v0, , );
-rtDeclareVariable(float3, tile_v1, , );   
-rtDeclareVariable(float3, crack_color, , );
-rtDeclareVariable(float,  crack_width, , );
 rtDeclareVariable(float3, Ka, , );
 rtDeclareVariable(float3, Ks, , );
 rtDeclareVariable(float3, Kd, , );
 
-RT_PROGRAM void floor_closest_hit_radiance()
+RT_PROGRAM void chair_closest_hit_radiance()
 {
+	
     float3 world_geo_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 world_shade_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 ffnormal     = faceforward( world_shade_normal, -ray.direction, world_geo_normal );
@@ -216,17 +212,8 @@ RT_PROGRAM void floor_closest_hit_radiance()
     
     float3 hit_point = ray.origin + t_hit * ray.direction;
 
-    float v0 = dot(tile_v0, hit_point);
-    float v1 = dot(tile_v1, hit_point);
-    v0 = v0 - floor(v0);
-    v1 = v1 - floor(v1);
-
-    float3 local_Kd;
-    if( v0 > crack_width && v1 > crack_width ){
-        local_Kd = Kd;
-    } else {
-        local_Kd = crack_color;
-    }
+    
+    
 
     for(int i = 0; i < lights.size(); ++i) {
         BasicLight light = lights[i];
