@@ -420,9 +420,9 @@ void Mouse::rotate(int x, int y)
 	intPosToFloatPos(x, y, xpos, ypos);
 
 	if (current_interaction.state == GLUT_DOWN) {
-        current_interaction.rotate_from.x = xpos;
-        current_interaction.rotate_from.y = ypos;
-        current_interaction.rotate_from.z = 0.8f;
+		current_interaction.rotate_from.x = xpos;
+		current_interaction.rotate_from.y = ypos;
+		current_interaction.rotate_from.z = 0.8f;
 
 	}
 	else if (current_interaction.state == GLUT_MOTION) {
@@ -664,7 +664,7 @@ Matrix4x4 PinholeCamera::makeTransform2(const Matrix4x4& trans, TransformCenter 
 	return final_trans;
 }
 
-void PinholeCamera::transform( const Matrix4x4& trans, TransformCenter transCenter )
+void PinholeCamera::transform(const Matrix4x4& trans, TransformCenter transCenter)
 {
 
 	const Matrix4x4 final_trans = makeTransform(trans, transCenter);
@@ -747,7 +747,7 @@ void PinholeCamera::rotatePhi(float rotation) {
 	}
 	// The code to fix the zooming ends here. 
 
-    float3 y_vec = { 0.0f, 1.0f, 0.0f };
+	float3 y_vec = { 0.0f, 1.0f, 0.0f };
 	// Makes sure that the phi-angle doesn't get too close to zero. 
 	if (abs(dot(normalize(newEye - lookat), y_vec)) < 0.99f){
 		eye = newEye;

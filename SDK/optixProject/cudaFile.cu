@@ -48,24 +48,36 @@ rtBuffer<uchar4, 2>              output_buffer;
 RT_PROGRAM void pinhole_camera()
 {
     size_t2 screen = output_buffer.size();
+	float3 prd_result;
+	PerRayData_radiance prd;
+
 
 	unsigned int seed = rot_seed(rnd_seeds[launch_index], frame);
-	float2 subpixel_jitter = make_float2(rnd(seed) - 0.5f, rnd(seed) - 0.5f) * jitter_factor;
 
-	float2 d = (make_float2(launch_index) + subpixel_jitter) / make_float2(screen) * 2.f - 1.f;
-    float3 ray_origin = eye;
-    float3 ray_direction = normalize(d.x*U + d.y*V + W);
+	for (int i = 0; i < 1; i++) {
+		float2 subpixel_jitter = make_float2(rnd(seed) - 0.5f, rnd(seed) - 0.5f) * jitter_factor;
 
-    optix::Ray ray(ray_origin, ray_direction, radiance_ray_type, scene_epsilon);
+		float2 d = (make_float2(launch_index) + subpixel_jitter) / make_float2(screen) * 2.f - 1.f;
+		float3 ray_origin = eye;
+		float3 ray_direction = normalize(d.x*U + d.y*V + W);
 
-    PerRayData_radiance prd;
-    prd.ray_id = launch_index;
-    prd.importance = 1.f;
-    prd.depth = 0;
+		optix::Ray ray(ray_origin, ray_direction, radiance_ray_type, scene_epsilon);
 
-    rtTrace(top_object, ray, prd);
 
-    output_buffer[launch_index] = make_color( prd.result );
+		prd.ray_id = launch_index;
+		prd.importance = 1.f;
+		prd.depth = 0;
+
+		rtTrace(top_object, ray, prd);
+		
+		prd_result += prd.result;
+		if (i > 0) {
+			prd_result = prd_result / 2;
+		}
+		
+		
+	}
+	output_buffer[launch_index] = make_color(prd_result);
 }
 
 
