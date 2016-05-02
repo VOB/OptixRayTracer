@@ -109,7 +109,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context["output_buffer"]->set(createOutputBuffer(RT_FORMAT_UNSIGNED_BYTE4, m_width, m_height));
 
 	//Anti aliasing variables
-	m_context["jitter_factor"]->setFloat(1.0f);
+	m_context["jitter_factor"]->setFloat(0.8f);
 	m_context["frame"]->setUint(0u);
 
 	m_rnd_seeds = m_context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_UNSIGNED_INT, m_width, m_height);
@@ -343,19 +343,19 @@ void OptixProject::createGeometry() //------------------------------------------
     wcWeaveParameters weave_params;
     // --- Woven Cloth parameters --
     char *weave_pattern_filename = "nordvalla.weave";
-	weave_params.uscale = 1000.f;
-	weave_params.vscale = 1000.f;
-	weave_params.umax   = 0.5f;
-	weave_params.psi    = 0.5f;
-    weave_params.alpha = 0.01f;
+	weave_params.uscale = 400.f;
+	weave_params.vscale = 400.f;
+	weave_params.umax   = 6.3f;
+	weave_params.psi    = 0.3f;
+    weave_params.alpha = 0.3f;
     weave_params.beta = 4.f;
-    weave_params.delta_x = 0.3f;
-    weave_params.intensity_fineness = 16.f;
-    weave_params.yarnvar_amplitude = 1.f;
-    weave_params.yarnvar_xscale = 1.f;
-    weave_params.yarnvar_yscale = 1.f;
-    weave_params.yarnvar_persistance = 1.f;
-    weave_params.yarnvar_octaves = 8.f;
+    weave_params.delta_x = 0.9f;
+    weave_params.intensity_fineness = 2.f;
+    weave_params.yarnvar_amplitude = 5.f;
+    weave_params.yarnvar_xscale = 3.f;
+    weave_params.yarnvar_yscale = 20.f;
+    weave_params.yarnvar_persistance = 0.7f;
+    weave_params.yarnvar_octaves = 4.f;
     float specular_strength = 0.3;
     // -----------------------------
 
