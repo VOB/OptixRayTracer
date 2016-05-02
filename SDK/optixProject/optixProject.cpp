@@ -96,6 +96,9 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context["scene_epsilon"]->setFloat(1.e-3f);
 	m_context["importance_cutoff"]->setFloat(0.01f);
 	m_context["ambient_light_color"]->setFloat(0.3f, 0.33f, 0.28f);
+	m_context["shadow_samples"]->setUint(2);
+
+	m_context["light_radius"]->setUint(2);
 
 	//Shadow ray modifiers
 	m_context["shadow_samples"]->setUint(2);
