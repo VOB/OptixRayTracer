@@ -29,6 +29,7 @@
 #include <ObjLoader.h>
 
 #include "woven_cloth.h"
+#include "random.h"
 
 using namespace optix;
 
@@ -71,6 +72,8 @@ private:
 	GeometryGroup geometrygroup;
 	float3*       m_vertices;
 	Material glass_matl;
+
+	Buffer m_rnd_seeds;
 };
 
 
@@ -81,22 +84,39 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	ss << "cudaFile.cu";
 	m_ptx_path = ptxpath("optixProject", ss.str());
 
-	// context 
+	// Setup state
 	m_context->setRayTypeCount(2);
 	m_context->setEntryPointCount(1);
 	m_context->setStackSize(4640);
 
-	m_context["max_depth"]->setInt(124);
+	//Context variables
+	m_context["max_depth"]->setInt(16);
 	m_context["radiance_ray_type"]->setUint(0);
 	m_context["shadow_ray_type"]->setUint(1);
-	m_context["frame_number"]->setUint(0u);
 	m_context["scene_epsilon"]->setFloat(1.e-3f);
 	m_context["importance_cutoff"]->setFloat(0.01f);
 	m_context["ambient_light_color"]->setFloat(0.3f, 0.33f, 0.28f);
 
+	//Shadow ray modifiers
+	m_context["shadow_samples"]->setUint(2);
+	m_context["light_radius"]->setUint(2);
+
+	//Rendering variables 
+	m_context["frame_number"]->setUint(0u);
 	m_context["output_buffer"]->set(createOutputBuffer(RT_FORMAT_UNSIGNED_BYTE4, m_width, m_height));
 
+	//Anti aliasing variables
+	m_context["jitter_factor"]->setFloat(1.0f);
+	m_context["frame"]->setUint(0u);
+
+	m_rnd_seeds = m_context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_UNSIGNED_INT, m_width, m_height);
+	m_context["rnd_seeds"]->setBuffer(m_rnd_seeds);
+	unsigned int* seeds = static_cast<unsigned int*>(m_rnd_seeds->map());
+	fillRandBuffer(seeds, m_width*m_height);
+	m_rnd_seeds->unmap();
+
 	// Ray gen program
+	m_context["super_samples"]->setUint(1);
 	std::string camera_name = "pinhole_camera";
 
 	Program ray_gen_program = m_context->createProgramFromPTXFile(m_ptx_path, camera_name);
@@ -129,8 +149,8 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context["lights"]->set(light_buffer);
 
 	// Set up camera
-	camera_data = InitialCameraData(make_float3(7.0f, 9.2f, -6.0f), // eye
-		make_float3(0.0f, 0.0f, 0.0f), // lookat
+	camera_data = InitialCameraData(make_float3(9.0f, 10.0f, -2.0f), // eye
+		make_float3(0.0f, 4.0f, 0.0f), // lookat
 		make_float3(0.0f, 1.0f, 0.0f), // up
 		60.0f);                          // vfov
 
@@ -225,16 +245,8 @@ void OptixProject::trace(const RayGenCameraData& camera_data)
 {
 	
 
-	updateGeometry();
+	//updateGeometry();
 	static float t = 0;
-	/*float3 oldRefraColor = glass_matl["refraction_color"]->getFloat3();
-	//oldRefraColor.x = oldRefraColor.x + sinf(t); //Varies color
-
-	float3 oldRefleColor = glass_matl["reflection_color"]->getFloat3();
-	//oldRefleColor.x = oldRefleColor.x + sinf(t); //varies color
-	t = t + 0.1f;
-	glass_matl["refraction_color"]->setFloat(oldRefraColor);
-	glass_matl["reflection_color"]->setFloat(oldRefleColor);*/
 	m_context["eye"]->setFloat(camera_data.eye);
 	m_context["U"]->setFloat(camera_data.U);
 	m_context["V"]->setFloat(camera_data.V);
@@ -268,9 +280,9 @@ void OptixProject::updateGeometry() {
 
 	//We don't have to set x and z here in this example
 	for (unsigned int v = 0; v < numVertices; v++)
-	/*{
+	{
 		new_vertices[v].y = m_vertices[v].y + (sinf(m_vertices[v].x / 0.3f * 3.0f + t) * 0.3f * 0.7f);
-	}*/
+	}
 
 	t += 0.1f;
 
@@ -327,9 +339,9 @@ void OptixProject::createGeometry() //------------------------------------------
 
     wcWeaveParameters weave_params;
     // --- Woven Cloth parameters --
-    char *weave_pattern_filename = "34697.wif";
-	weave_params.uscale = 15.f;
-	weave_params.vscale = 15.f;
+    char *weave_pattern_filename = "nordvalla.weave";
+	weave_params.uscale = 1000.f;
+	weave_params.vscale = 1000.f;
 	weave_params.umax   = 0.5f;
 	weave_params.psi    = 0.5f;
     weave_params.alpha = 0.01f;
@@ -431,10 +443,10 @@ void OptixProject::createGeometry() //------------------------------------------
 		},
 
 		{"cognacglass.obj", metal_matl, 
-            {0.5f, 0.0f, 0.0f, 0.0f,
-		    0.0f, -0.5f, 0.0f, 12.0f,
-		    0.0f, 0.0f, 0.5f, 0.0f,
-		    0.0f, 0.0f, 0.0f, 0.5f}
+            {0.16f, 0.0f, 0.0f, 0.0f,
+		    0.0f, 0.16f, 0.0f, 4.55f,
+		    0.0f, 0.0f, 0.16f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 0.16f}
         },
         
         {"chair.obj", chair_matl, 

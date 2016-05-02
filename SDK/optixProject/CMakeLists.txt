@@ -11,8 +11,9 @@ if(GLUT_FOUND AND OPENGL_FOUND)
     cloth-shader/src/woven_cloth.cpp
     cudaFile.cu
 
-    # These files are common among multiple samples
+    
     commonStructs.h
+    random.h
     )
 else()
   # GLUT or OpenGL not found

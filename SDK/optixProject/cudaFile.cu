@@ -5,6 +5,7 @@
 #define WC_PREFIX __device__
 #define WC_NO_FILES
 #include "woven_cloth.cpp"
+#include "random.h"
 
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, ); 
 rtDeclareVariable(float3, shading_normal,   attribute shading_normal, ); 
@@ -25,6 +26,15 @@ rtDeclareVariable(rtObject,     top_object, , );
 rtDeclareVariable(float3, dPdu, attribute dPdu, );
 rtDeclareVariable(float3, dPdv, attribute dPdv, );
 
+//Shadow ray variables
+rtDeclareVariable(unsigned int, shadow_samples, , );
+rtDeclareVariable(unsigned int, light_radius, , );
+
+//Anti-aliasing variables
+rtDeclareVariable(float,		jitter_factor, , );
+rtDeclareVariable(unsigned int, frame, , );
+rtBuffer<unsigned int, 2>		rnd_seeds;
+
 //
 // Pinhole camera implementation
 //
@@ -38,7 +48,11 @@ rtBuffer<uchar4, 2>              output_buffer;
 RT_PROGRAM void pinhole_camera()
 {
     size_t2 screen = output_buffer.size();
-    float2 d = make_float2(launch_index) / make_float2(screen) * 2.f - 1.f;
+
+	unsigned int seed = rot_seed(rnd_seeds[launch_index], frame);
+	float2 subpixel_jitter = make_float2(rnd(seed) - 0.5f, rnd(seed) - 0.5f) * jitter_factor;
+
+	float2 d = (make_float2(launch_index) + subpixel_jitter) / make_float2(screen) * 2.f - 1.f;
     float3 ray_origin = eye;
     float3 ray_direction = normalize(d.x*U + d.y*V + W);
 
@@ -205,7 +219,6 @@ RT_PROGRAM void chair_closest_hit_radiance()
     float3 color = Ka * ambient_light_color;
 	
 	
-	int shadow_samples = 3;
 	float shadow_intensity = 0.3f/(float)shadow_samples;
 	unsigned int num_lights = lights.size();
 	PerRayData_shadow shadow_prd;
@@ -221,7 +234,7 @@ RT_PROGRAM void chair_closest_hit_radiance()
         float nDl = dot( ffnormal, L);
 
 		for(int i=0;i<shadow_samples;i++){
-			float r = 2.f*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
+			float r = light_radius*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
 				(prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
 			float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
 				(prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
@@ -437,7 +450,6 @@ RT_PROGRAM void exception()
 
 RT_PROGRAM void only_shadows_closest_hit_radiance()
 {
-    int shadow_samples = 3;
     float shadow_intensity = 0.3f/(float)shadow_samples;
     float3 color = bg_color;
     float3 hit_point = ray.origin + t_hit * ray.direction;
@@ -445,7 +457,7 @@ RT_PROGRAM void only_shadows_closest_hit_radiance()
     for(int i = 0; i < num_lights; ++i) {
         BasicLight light = lights[i];
         for(int i=0;i<shadow_samples;i++){
-            float r = 2.f*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
+            float r = light_radius*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
                 (prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
             float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
                 (prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
@@ -497,7 +509,6 @@ RT_PROGRAM void cloth_closest_hit_radiance()
 
 	
     PerRayData_shadow shadow_prd;
-	int shadow_samples = 3;
 	float shadow_intensity = 0.3f/(float)shadow_samples;
 
     unsigned int num_lights = lights.size();
@@ -512,7 +523,7 @@ RT_PROGRAM void cloth_closest_hit_radiance()
         intersection.wi_z = optix::dot(L, p_normal);
 
         for(int i=0;i<shadow_samples;i++){
-            float r = 2.f*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
+            float r = light_radius*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
                 (prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
             float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
                 (prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
