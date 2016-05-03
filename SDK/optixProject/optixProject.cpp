@@ -126,7 +126,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	// Exception / miss programs
 	Program exception_program = m_context->createProgramFromPTXFile(m_ptx_path, "exception");
 	m_context->setExceptionProgram(0, exception_program);
-	m_context["bad_color"]->setFloat(0.0f, 1.0f, 0.0f);
+	m_context["bad_color"]->setFloat(1.0f, 0.0f, 0.0f);
 
 	std::string miss_name = "envmap_miss";
 	m_context->setMissProgram(0, m_context->createProgramFromPTXFile(m_ptx_path, miss_name));
@@ -151,9 +151,9 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 
 	// Set up camera
 	camera_data = 
-		InitialCameraData(make_float3(2.1f, 4.7f, 0.18f), // eye - material test
+		InitialCameraData(make_float3(2.75f, 5.4f, -3.8f), // eye - material test
 		//InitialCameraData(make_float3(9.0f, 10.0f, -2.0f), // eye - full scene
-		make_float3(0.0f, 4.0f, 0.0f), // lookat
+		make_float3(0.0f, 1.0f, 0.0f), // lookat
 		make_float3(0.0f, 1.0f, 0.0f), // up
 		60.0f);                          // vfov
 
@@ -344,8 +344,8 @@ void OptixProject::createGeometry() //------------------------------------------
     // --- Woven Cloth parameters --
     char *weave_pattern_filename = "nordvalla.weave";
 
-	weave_params.uscale = 300.f;
-	weave_params.vscale = 300.f;
+	weave_params.uscale = 100.f;
+	weave_params.vscale = 100.f;
 	weave_params.umax   = 0.5f;
 	weave_params.psi    = 0.3f;
     weave_params.alpha = 0.3f;
@@ -459,7 +459,7 @@ void OptixProject::createGeometry() //------------------------------------------
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
         },*/
-        {"cloth_on_chair.obj", cloth_matl, 
+        {"teapot.obj", glass_matl,
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
@@ -518,7 +518,7 @@ int main(int argc, char** argv)
 	//--------------------------------------------//
 
 	std::stringstream title;
-	title << "Nice stuff yo";
+	title << "OptiX Render";
 	try {
 		
 		OptixProject scene(texture_path);
