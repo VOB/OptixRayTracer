@@ -90,15 +90,13 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context->setStackSize(4640);
 
 	//Context variables
-	m_context["max_depth"]->setInt(16);
+	m_context["max_depth"]->setInt(12);
 	m_context["radiance_ray_type"]->setUint(0);
 	m_context["shadow_ray_type"]->setUint(1);
 	m_context["scene_epsilon"]->setFloat(1.e-3f);
 	m_context["importance_cutoff"]->setFloat(0.01f);
 	m_context["ambient_light_color"]->setFloat(0.3f, 0.33f, 0.28f);
 	m_context["shadow_samples"]->setUint(2);
-
-	m_context["light_radius"]->setUint(2);
 
 	//Shadow ray modifiers
 	m_context["shadow_samples"]->setUint(2);
@@ -109,8 +107,8 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context["output_buffer"]->set(createOutputBuffer(RT_FORMAT_UNSIGNED_BYTE4, m_width, m_height));
 
 	//Anti aliasing variables
-	m_context["jitter_factor"]->setFloat(0.8f);
-	m_context["frame"]->setUint(0u);
+	m_context["jitter_factor"]->setFloat(1.0f);
+	m_context["frame"]->setUint(1);
 
 	m_rnd_seeds = m_context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_UNSIGNED_INT, m_width, m_height);
 	m_context["rnd_seeds"]->setBuffer(m_rnd_seeds);
@@ -152,7 +150,9 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context["lights"]->set(light_buffer);
 
 	// Set up camera
-	camera_data = InitialCameraData(make_float3(9.0f, 10.0f, -2.0f), // eye
+	camera_data = 
+		InitialCameraData(make_float3(2.1f, 4.7f, 0.18f), // eye - material test
+		//InitialCameraData(make_float3(9.0f, 10.0f, -2.0f), // eye - full scene
 		make_float3(0.0f, 4.0f, 0.0f), // lookat
 		make_float3(0.0f, 1.0f, 0.0f), // up
 		60.0f);                          // vfov
@@ -343,14 +343,14 @@ void OptixProject::createGeometry() //------------------------------------------
     wcWeaveParameters weave_params;
     // --- Woven Cloth parameters --
     char *weave_pattern_filename = "nordvalla.weave";
-	weave_params.uscale = 100.f;
-	weave_params.vscale = 100.f;
-	weave_params.umax   = 6.3f;
+	weave_params.uscale = 500.f;
+	weave_params.vscale = 500.f;
+	weave_params.umax   = 0.8f;
 	weave_params.psi    = 0.3f;
     weave_params.alpha = 0.3f;
     weave_params.beta = 4.f;
     weave_params.delta_x = 0.9f;
-    weave_params.intensity_fineness = 2.f;
+    weave_params.intensity_fineness = 0.f;
     weave_params.yarnvar_amplitude = 5.f;
     weave_params.yarnvar_xscale = 3.f;
     weave_params.yarnvar_yscale = 20.f;
@@ -413,7 +413,7 @@ void OptixProject::createGeometry() //------------------------------------------
 		glass_matl->setAnyHitProgram(1, glass_ah);
 
 		glass_matl["importance_cutoff"]->setFloat(1e-2f);
-		glass_matl["cutoff_color"]->setFloat(0.34f, 0.55f, 0.85f);
+		glass_matl["cutoff_color"]->setFloat(0.9f, 0.9f, 0.9f);
 		glass_matl["fresnel_exponent"]->setFloat(3.0f);
 		glass_matl["fresnel_minimum"]->setFloat(0.1f);
 		glass_matl["fresnel_maximum"]->setFloat(1.0f);
@@ -430,7 +430,7 @@ void OptixProject::createGeometry() //------------------------------------------
 	geometrygroup = m_context->createGeometryGroup();
 
     struct ObjFile objs[] = {
-		
+		/*
         {"floor.obj", floor_matl, 
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
@@ -457,7 +457,7 @@ void OptixProject::createGeometry() //------------------------------------------
 		    0.0f, 1.0f, 0.0f, 0.0f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
-        },
+        },*/
         {"cloth_on_chair.obj", cloth_matl, 
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
