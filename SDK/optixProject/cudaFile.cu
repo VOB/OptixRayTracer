@@ -48,13 +48,16 @@ rtBuffer<uchar4, 2>              output_buffer;
 RT_PROGRAM void pinhole_camera()
 {
     size_t2 screen = output_buffer.size();
-	float3 prd_result;
+    float3 prd_result = make_float3(0.f,0.f,0.f);
 	PerRayData_radiance prd;
 
 
 	unsigned int seed = rot_seed(rnd_seeds[launch_index], frame);
 
-	for (int i = 0; i < 1; i++) {
+    int num_samples = 4;
+    float inv_num_samples = 1.f/(float)num_samples;
+
+	for (int i = 0; i < num_samples; i++) {
 		float2 subpixel_jitter = make_float2(rnd(seed) - 0.5f, rnd(seed) - 0.5f) * jitter_factor;
 
 		float2 d = (make_float2(launch_index) + subpixel_jitter) / make_float2(screen) * 2.f - 1.f;
@@ -70,13 +73,10 @@ RT_PROGRAM void pinhole_camera()
 
 		rtTrace(top_object, ray, prd);
 		
-		prd_result += prd.result;
-		if (i > 0) {
-			prd_result = prd_result / 2;
-		}
-		
+		prd_result += prd.result*inv_num_samples;
 		
 	}
+
 	output_buffer[launch_index] = make_color(prd_result);
 }
 
@@ -509,8 +509,11 @@ RT_PROGRAM void cloth_closest_hit_radiance()
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 p_normal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
-    float3 u_vec = normalize( rtTransformVector( RT_OBJECT_TO_WORLD, dPdu));
-    float3 v_vec = normalize( rtTransformVector( RT_OBJECT_TO_WORLD, dPdv));
+    float3 tmp_u = normalize( rtTransformVector( RT_OBJECT_TO_WORLD, dPdu));
+    float3 tmp_v = normalize( rtTransformVector( RT_OBJECT_TO_WORLD, dPdv));
+
+    float3 u_vec = cross(tmp_v,p_normal);
+    float3 v_vec = cross(p_normal,u_vec);
 
     wcIntersectionData intersection;
     intersection.uv_x = texcoord.x;
