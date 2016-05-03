@@ -52,13 +52,13 @@ RT_PROGRAM void pinhole_camera()
 	PerRayData_radiance prd;
 
 
-	unsigned int seed = rot_seed(rnd_seeds[launch_index], frame);
+	prd.seed = rot_seed(rnd_seeds[launch_index], frame);
 
     int num_samples = 4;
     float inv_num_samples = 1.f/(float)num_samples;
 
 	for (int i = 0; i < num_samples; i++) {
-		float2 subpixel_jitter = make_float2(rnd(seed) - 0.5f, rnd(seed) - 0.5f) * jitter_factor;
+		float2 subpixel_jitter = make_float2(rnd(prd.seed) - 0.5f, rnd(prd.seed) - 0.5f) * jitter_factor;
 
 		float2 d = (make_float2(launch_index) + subpixel_jitter) / make_float2(screen) * 2.f - 1.f;
 		float3 ray_origin = eye;
@@ -66,8 +66,6 @@ RT_PROGRAM void pinhole_camera()
 
 		optix::Ray ray(ray_origin, ray_direction, radiance_ray_type, scene_epsilon);
 
-
-		prd.ray_id = launch_index;
 		prd.importance = 1.f;
 		prd.depth = 0;
 
@@ -246,12 +244,9 @@ RT_PROGRAM void chair_closest_hit_radiance()
         float nDl = dot( ffnormal, L);
 
 		for(int i=0;i<shadow_samples;i++){
-			float r = light_radius*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
-				(prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
-			float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
-				(prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
-			float phi   = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +2, 
-				(prd_radiance.ray_id.y*shadow_samples +i)*3 +2, 8);
+			float r = light_radius*rnd(prd_radiance.seed);
+			float theta = rnd(prd_radiance.seed)*M_2_PI;
+			float phi   = rnd(prd_radiance.seed)*M_PI;
 			float3 offset = make_float3(r*sin(theta)*sin(phi),r*cos(theta)*sin(phi),r*cos(phi));
 			float Ldist = optix::length(light.pos + offset - hit_point);
 			float3 L = optix::normalize(light.pos + offset - hit_point);
@@ -469,12 +464,9 @@ RT_PROGRAM void only_shadows_closest_hit_radiance()
     for(int i = 0; i < num_lights; ++i) {
         BasicLight light = lights[i];
         for(int i=0;i<shadow_samples;i++){
-            float r = light_radius*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
-            float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
-            float phi   = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +2, 
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +2, 8);
+            float r = light_radius*rnd(prd_radiance.seed);
+			float theta = rnd(prd_radiance.seed)*M_2_PI;
+			float phi   = rnd(prd_radiance.seed)*M_PI;
             float3 offset = make_float3(r*sin(theta)*sin(phi),r*cos(theta)*sin(phi),r*cos(phi));
             float Ldist = optix::length(light.pos + offset - hit_point);
             float3 L = optix::normalize(light.pos + offset - hit_point);
@@ -538,12 +530,9 @@ RT_PROGRAM void cloth_closest_hit_radiance()
         intersection.wi_z = optix::dot(L, p_normal);
 
         for(int i=0;i<shadow_samples;i++){
-            float r = light_radius*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
-            float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
-            float phi   = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +2, 
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +2, 8);
+            float r = light_radius*rnd(prd_radiance.seed);
+			float theta = rnd(prd_radiance.seed)*M_2_PI;
+			float phi   = rnd(prd_radiance.seed)*M_PI;
             float3 offset = make_float3(r*sin(theta)*sin(phi),r*cos(theta)*sin(phi),r*cos(phi));
             float Ldist = optix::length(light.pos + offset - hit_point);
             float3 L = optix::normalize(light.pos + offset - hit_point);
