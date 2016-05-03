@@ -148,65 +148,14 @@ RT_PROGRAM void metal_closest_hit_radiance()
     float3 ffnormal     = faceforward( world_shade_normal, -ray.direction, world_geo_normal );
     float3 hit_point = ray.origin + t_hit * ray.direction;
 
-    /* Sum several octaves of abs(snoise), i.e. turbulence.  Limit the
-    * number of octaves by the estimated change in PP between adjacent
-    * shading samples.
-    */
-    float3 PP = txtscale * hit_point;
-    float a = 1;
-    float sum = 0;
-    for(int i = 0; i < MAXOCTAVES; i++ ){
-        sum += a * fabs(snoise(PP));
-        PP *= 2.0f;
-        a *= 0.5f;
-    }
-
-
-    float3 color = metalcolor * metalKa * ambient_light_color;
-    for(int i = 0; i < lights.size(); ++i) {
-        BasicLight light = lights[i];
-        float3 L = normalize(light.pos - hit_point);
-        float nmDl = dot( ffnormal, L);
-
-        if( nmDl > 0.0f){
-            // cast shadow ray
-            PerRayData_shadow shadow_prd;
-            shadow_prd.attenuation = make_float3(1.0f);
-            float Ldist = length(light.pos - hit_point);
-            optix::Ray shadow_ray( hit_point, L, shadow_ray_type, scene_epsilon, Ldist );
-            rtTrace(top_shadower, shadow_ray, shadow_prd);
-            float3 light_attenuation = shadow_prd.attenuation;
-
-            if( fmaxf(light_attenuation) > 0.0f ){
-                float3 Lc = light.color * light_attenuation;
-                color += Lc;
-
-                float r = nmDl;
-                if(nmDl > 0.0f){
-                    float3 H = normalize(L - ray.direction);
-                    float nmDh = dot( ffnormal, H );
-                    if(nmDh > 0)
-                        color += r * metalKs * Lc * pow(nmDh, 1.f/metalroughness);
-                }
-            }
-
-        }
-    }
-
-    float3 r = schlick(-dot(ffnormal, ray.direction), reflectivity_n );
-    float importance = prd_radiance.importance * optix::luminance( r );
-
+    float3 color = make_float3(0.f,0.f,0.f);
     // reflection ray
-    if( importance > importance_cutoff && prd_radiance.depth < max_depth) {
-        PerRayData_radiance refl_prd;
-        refl_prd.importance = importance;
-        refl_prd.depth = prd_radiance.depth+1;
-        float3 R = reflect( ray.direction, ffnormal );
-        optix::Ray refl_ray( hit_point, R, radiance_ray_type, scene_epsilon );
-        rtTrace(top_object, refl_ray, refl_prd);
-        color += r * refl_prd.result;
-    }
-
+    PerRayData_radiance refl_prd;
+    refl_prd.depth = prd_radiance.depth+1;
+    float3 R = reflect( ray.direction, ffnormal );
+    optix::Ray refl_ray( hit_point, R, radiance_ray_type, scene_epsilon );
+    rtTrace(top_object, refl_ray, refl_prd);
+    color += 0.95* refl_prd.result;
     prd_radiance.result = color;
 }
 
