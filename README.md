@@ -2,7 +2,7 @@
 
 Requirements to run code:
 
-- Visual Studio (preferred 2013. Earlier works, but 2015 is not supported by NVidia OptiX yet)
+- Visual Studio (preferred 2013. Earlier works, but 2015 is not supported by NVidia OptiX 3.9)
 
 - CUDA Toolkit
 
