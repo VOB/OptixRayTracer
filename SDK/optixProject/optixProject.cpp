@@ -343,9 +343,10 @@ void OptixProject::createGeometry() //------------------------------------------
     wcWeaveParameters weave_params;
     // --- Woven Cloth parameters --
     char *weave_pattern_filename = "nordvalla.weave";
-	weave_params.uscale = 500.f;
-	weave_params.vscale = 500.f;
-	weave_params.umax   = 0.8f;
+
+	weave_params.uscale = 300.f;
+	weave_params.vscale = 300.f;
+	weave_params.umax   = 0.5f;
 	weave_params.psi    = 0.3f;
     weave_params.alpha = 0.3f;
     weave_params.beta = 4.f;
