@@ -151,9 +151,17 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 
 	// Set up camera
 	camera_data = 
+		
+		//CAMERA POS
 		InitialCameraData(make_float3(2.75f, 5.4f, -3.8f), // eye - material test
+		//InitialCameraData(make_float3(7.17477f, 1.58335f, 1.67067f), // eye - zoomed out shadow test
+		//InitialCameraData(make_float3(3.72449f, 0.184227f, 1.06495f), // eye - zoomed in shadow test
 		//InitialCameraData(make_float3(9.0f, 10.0f, -2.0f), // eye - full scene
+		
+		//LOOKAT
 		make_float3(0.0f, 1.0f, 0.0f), // lookat
+		//make_float3(2.57046f, -0.564597f, 1.23139f), // lookat - shadow test
+
 		make_float3(0.0f, 1.0f, 0.0f), // up
 		60.0f);                          // vfov
 
@@ -456,14 +464,14 @@ void OptixProject::createGeometry() //------------------------------------------
 	geometrygroup = m_context->createGeometryGroup();
 
     struct ObjFile objs[] = {
-		/*
+		
         {"floor.obj", floor_matl, 
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
         },
-
+		/*
 		{ "bunny_uv.obj", glass_matl,
 			{ 10.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, 10.0f, 0.0f, 0.0f,
@@ -484,11 +492,11 @@ void OptixProject::createGeometry() //------------------------------------------
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
         },*/
-        {"bunny_uv.obj", metal_matl,
-           {10.0f, 0.0f, 0.0f, 0.0f,
-		    0.0f, 10.0f, 0.0f, 0.0f,
-		    0.0f, 0.0f, 10.0f, 0.0f,
-		    0.0f, 0.0f, 0.0f, 10.0f}
+        {"teapot.obj", black_matl,
+           {1.0f, 0.0f, 0.0f, 0.0f,
+		    0.0f, 1.0f, 0.0f, 0.0f,
+		    0.0f, 0.0f, 1.0f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 1.0f}
         }
     };
 
