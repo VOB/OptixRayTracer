@@ -150,12 +150,14 @@ RT_PROGRAM void metal_closest_hit_radiance()
 
     float3 color = make_float3(0.f,0.f,0.f);
     // reflection ray
-    PerRayData_radiance refl_prd;
-    refl_prd.depth = prd_radiance.depth+1;
-    float3 R = reflect( ray.direction, ffnormal );
-    optix::Ray refl_ray( hit_point, R, radiance_ray_type, scene_epsilon );
-    rtTrace(top_object, refl_ray, refl_prd);
-    color += 0.95* refl_prd.result;
+	if (prd_radiance.depth < max_depth) {
+		PerRayData_radiance refl_prd;
+		refl_prd.depth = prd_radiance.depth + 1;
+		float3 R = reflect(ray.direction, ffnormal);
+		optix::Ray refl_ray(hit_point, R, radiance_ray_type, scene_epsilon);
+		rtTrace(top_object, refl_ray, refl_prd);
+		color += 0.95* refl_prd.result;
+	}
     prd_radiance.result = color;
 }
 
@@ -434,6 +436,16 @@ RT_PROGRAM void only_shadows_closest_hit_radiance()
     prd_radiance.result = color;
 }
 
+// ------------- Black surface ----------------
+
+RT_PROGRAM void black_closest_hit_radiance()
+{
+	float3 color = { 0.f, 0.f, 0.f };
+
+	prd_radiance.result = color;
+}
+
+
 // ------------- Woven Cloth ----------------
 
 rtDeclareVariable(wcWeaveParameters, wc_parameters, , );
@@ -513,3 +525,35 @@ RT_PROGRAM void cloth_closest_hit_radiance()
     prd_radiance.result = color;
 }
 
+// ------------- Epilepsy ----------------
+RT_PROGRAM void epilepsy_closest_hit_radiance()
+{
+	{
+		float shadow_intensity = 0.3f / (float)shadow_samples;
+		float3 color;
+		float3 hit_point = ray.origin + t_hit * ray.direction;
+		unsigned int num_lights = lights.size();
+		for (int i = 0; i < num_lights; ++i) {
+			BasicLight light = lights[i];
+			for (int i = 0; i<shadow_samples; i++){
+				float r = light_radius*rnd(prd_radiance.seed);
+				float theta = rnd(prd_radiance.seed)*M_2_PI;
+				float phi = rnd(prd_radiance.seed)*M_PI;
+				float3 offset = make_float3(r*sin(theta)*sin(phi), r*cos(theta)*sin(phi), r*cos(phi));
+				float Ldist = optix::length(light.pos + offset - hit_point);
+				float3 L = optix::normalize(light.pos + offset - hit_point);
+
+				// cast shadow ray
+				if (light.casts_shadow) {
+					PerRayData_shadow shadow_prd;
+					shadow_prd.attenuation = make_float3(1.0f);
+					optix::Ray shadow_ray = optix::make_Ray(hit_point, L, shadow_ray_type, scene_epsilon, Ldist);
+					rtTrace(top_shadower, shadow_ray, shadow_prd);
+					color = shadow_prd.attenuation*shadow_intensity*color + (1.f - shadow_intensity)*color;
+				}
+			}
+		}
+
+		prd_radiance.result = color;
+	}
+}

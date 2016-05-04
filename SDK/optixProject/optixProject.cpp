@@ -90,7 +90,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context->setStackSize(4640);
 
 	//Context variables
-	m_context["max_depth"]->setInt(12);
+	m_context["max_depth"]->setInt(128);
 	m_context["radiance_ray_type"]->setUint(0);
 	m_context["shadow_ray_type"]->setUint(1);
 	m_context["scene_epsilon"]->setFloat(1.e-3f);
@@ -344,8 +344,8 @@ void OptixProject::createGeometry() //------------------------------------------
     // --- Woven Cloth parameters --
     char *weave_pattern_filename = "nordvalla.weave";
 
-	weave_params.uscale = 100.f;
-	weave_params.vscale = 100.f;
+	weave_params.uscale = 500.f;
+	weave_params.vscale = 500.f;
 	weave_params.umax   = 0.5f;
 	weave_params.psi    = 0.3f;
     weave_params.alpha = 0.3f;
@@ -368,6 +368,8 @@ void OptixProject::createGeometry() //------------------------------------------
     cloth_matl["wc_pattern"]->setUserData(sizeof(PatternEntry)*pattern_size,weave_params.pattern_entry);
 	
 
+	//chair material
+
 	Material chair_matl = m_context->createMaterial();
 	Program chair_ch = m_context->createProgramFromPTXFile(m_ptx_path, "chair_closest_hit_radiance");
 	chair_matl->setClosestHitProgram(0, chair_ch);
@@ -382,11 +384,15 @@ void OptixProject::createGeometry() //------------------------------------------
 	chair_matl["reflectivity_n"]->setFloat(0.01f, 0.01f, 0.01f);
 	chair_matl["phong_exp"]->setFloat(88);
 
+	//floor material
+
     Material floor_matl = m_context->createMaterial();
 	Program floor_ch = m_context->createProgramFromPTXFile(m_ptx_path, "only_shadows_closest_hit_radiance");
 	floor_matl->setClosestHitProgram(0, floor_ch);
 
 	floor_matl->setAnyHitProgram(1, ah);
+
+	//metal material
 
 	Material metal_matl = m_context->createMaterial();
 	Program metal_ch = m_context->createProgramFromPTXFile(m_ptx_path, "metal_closest_hit_radiance");
@@ -400,6 +406,22 @@ void OptixProject::createGeometry() //------------------------------------------
 	metal_matl["Ks"]->setFloat(0.8f, 0.9f, 0.8f);
 	metal_matl["phong_exp"]->setFloat(88);
 	metal_matl["reflectivity_n"]->setFloat(0.2f, 0.2f, 0.2f);
+
+	//black material
+
+	Material black_matl = m_context->createMaterial();
+	Program black_ch = m_context->createProgramFromPTXFile(m_ptx_path, "black_closest_hit_radiance");
+	black_matl->setClosestHitProgram(0, black_ch);
+	black_matl->setAnyHitProgram(1, ah);
+
+	//epilepsy material
+
+	Material epilepsy_matl = m_context->createMaterial();
+	Program epilepsy_ch = m_context->createProgramFromPTXFile(m_ptx_path, "epilepsy_closest_hit_radiance");
+	epilepsy_matl->setClosestHitProgram(0, epilepsy_ch);
+	epilepsy_matl->setAnyHitProgram(1, ah);
+
+
 
 	// Glass material
 	
@@ -428,6 +450,9 @@ void OptixProject::createGeometry() //------------------------------------------
 		glass_matl["shadow_attenuation"]->setFloat(0.4f, 0.7f, 0.4f);
 	//}
 
+	//--------------------------------
+	//CREATING OBJECTS
+	//--------------------------------
 	geometrygroup = m_context->createGeometryGroup();
 
     struct ObjFile objs[] = {
@@ -459,11 +484,11 @@ void OptixProject::createGeometry() //------------------------------------------
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
         },*/
-        {"teapot.obj", glass_matl,
-           {1.0f, 0.0f, 0.0f, 0.0f,
-		    0.0f, 1.0f, 0.0f, 0.0f,
-		    0.0f, 0.0f, 1.0f, 0.0f,
-		    0.0f, 0.0f, 0.0f, 1.0f}
+        {"bunny_uv.obj", metal_matl,
+           {10.0f, 0.0f, 0.0f, 0.0f,
+		    0.0f, 10.0f, 0.0f, 0.0f,
+		    0.0f, 0.0f, 10.0f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 10.0f}
         }
     };
 
