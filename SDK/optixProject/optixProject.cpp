@@ -29,6 +29,7 @@
 #include <ObjLoader.h>
 
 #include "woven_cloth.h"
+#include "random.h"
 
 using namespace optix;
 
@@ -71,6 +72,8 @@ private:
 	GeometryGroup geometrygroup;
 	float3*       m_vertices;
 	Material glass_matl;
+
+	Buffer m_rnd_seeds;
 };
 
 
@@ -81,22 +84,40 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	ss << "cudaFile.cu";
 	m_ptx_path = ptxpath("optixProject", ss.str());
 
-	// context 
+	// Setup state
 	m_context->setRayTypeCount(2);
 	m_context->setEntryPointCount(1);
 	m_context->setStackSize(4640);
 
-	m_context["max_depth"]->setInt(124);
+	//Context variables
+	m_context["max_depth"]->setInt(128);
 	m_context["radiance_ray_type"]->setUint(0);
 	m_context["shadow_ray_type"]->setUint(1);
-	m_context["frame_number"]->setUint(0u);
 	m_context["scene_epsilon"]->setFloat(1.e-3f);
 	m_context["importance_cutoff"]->setFloat(0.01f);
 	m_context["ambient_light_color"]->setFloat(0.3f, 0.33f, 0.28f);
+	m_context["shadow_samples"]->setUint(2);
 
+	//Shadow ray modifiers
+	m_context["shadow_samples"]->setUint(2);
+	m_context["light_radius"]->setUint(2);
+
+	//Rendering variables 
+	m_context["frame_number"]->setUint(0u);
 	m_context["output_buffer"]->set(createOutputBuffer(RT_FORMAT_UNSIGNED_BYTE4, m_width, m_height));
 
+	//Anti aliasing variables
+	m_context["jitter_factor"]->setFloat(1.0f);
+	m_context["frame"]->setUint(1);
+
+	m_rnd_seeds = m_context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_UNSIGNED_INT, m_width, m_height);
+	m_context["rnd_seeds"]->setBuffer(m_rnd_seeds);
+	unsigned int* seeds = static_cast<unsigned int*>(m_rnd_seeds->map());
+	fillRandBuffer(seeds, m_width*m_height);
+	m_rnd_seeds->unmap();
+
 	// Ray gen program
+	m_context["super_samples"]->setUint(1);
 	std::string camera_name = "pinhole_camera";
 
 	Program ray_gen_program = m_context->createProgramFromPTXFile(m_ptx_path, camera_name);
@@ -105,7 +126,7 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	// Exception / miss programs
 	Program exception_program = m_context->createProgramFromPTXFile(m_ptx_path, "exception");
 	m_context->setExceptionProgram(0, exception_program);
-	m_context["bad_color"]->setFloat(0.0f, 1.0f, 0.0f);
+	m_context["bad_color"]->setFloat(1.0f, 0.0f, 0.0f);
 
 	std::string miss_name = "envmap_miss";
 	m_context->setMissProgram(0, m_context->createProgramFromPTXFile(m_ptx_path, miss_name));
@@ -129,8 +150,18 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	m_context["lights"]->set(light_buffer);
 
 	// Set up camera
-	camera_data = InitialCameraData(make_float3(7.0f, 9.2f, -6.0f), // eye
-		make_float3(0.0f, 0.0f, 0.0f), // lookat
+	camera_data = 
+		
+		//CAMERA POS
+		InitialCameraData(make_float3(2.75f, 5.4f, -3.8f), // eye - material test
+		//InitialCameraData(make_float3(7.17477f, 1.58335f, 1.67067f), // eye - zoomed out shadow test
+		//InitialCameraData(make_float3(3.72449f, 0.184227f, 1.06495f), // eye - zoomed in shadow test
+		//InitialCameraData(make_float3(9.0f, 10.0f, -2.0f), // eye - full scene
+		
+		//LOOKAT
+		make_float3(0.0f, 1.0f, 0.0f), // lookat
+		//make_float3(2.57046f, -0.564597f, 1.23139f), // lookat - shadow test
+
 		make_float3(0.0f, 1.0f, 0.0f), // up
 		60.0f);                          // vfov
 
@@ -225,16 +256,8 @@ void OptixProject::trace(const RayGenCameraData& camera_data)
 {
 	
 
-	updateGeometry();
+	//updateGeometry();
 	static float t = 0;
-	/*float3 oldRefraColor = glass_matl["refraction_color"]->getFloat3();
-	//oldRefraColor.x = oldRefraColor.x + sinf(t); //Varies color
-
-	float3 oldRefleColor = glass_matl["reflection_color"]->getFloat3();
-	//oldRefleColor.x = oldRefleColor.x + sinf(t); //varies color
-	t = t + 0.1f;
-	glass_matl["refraction_color"]->setFloat(oldRefraColor);
-	glass_matl["reflection_color"]->setFloat(oldRefleColor);*/
 	m_context["eye"]->setFloat(camera_data.eye);
 	m_context["U"]->setFloat(camera_data.U);
 	m_context["V"]->setFloat(camera_data.V);
@@ -268,9 +291,9 @@ void OptixProject::updateGeometry() {
 
 	//We don't have to set x and z here in this example
 	for (unsigned int v = 0; v < numVertices; v++)
-	/*{
+	{
 		new_vertices[v].y = m_vertices[v].y + (sinf(m_vertices[v].x / 0.3f * 3.0f + t) * 0.3f * 0.7f);
-	}*/
+	}
 
 	t += 0.1f;
 
@@ -327,20 +350,21 @@ void OptixProject::createGeometry() //------------------------------------------
 
     wcWeaveParameters weave_params;
     // --- Woven Cloth parameters --
-    char *weave_pattern_filename = "34697.wif";
-	weave_params.uscale = 15.f;
-	weave_params.vscale = 15.f;
+    char *weave_pattern_filename = "nordvalla.weave";
+
+	weave_params.uscale = 500.f;
+	weave_params.vscale = 500.f;
 	weave_params.umax   = 0.5f;
-	weave_params.psi    = 0.5f;
-    weave_params.alpha = 0.01f;
+	weave_params.psi    = 0.3f;
+    weave_params.alpha = 0.3f;
     weave_params.beta = 4.f;
-    weave_params.delta_x = 0.3f;
-    weave_params.intensity_fineness = 16.f;
-    weave_params.yarnvar_amplitude = 1.f;
-    weave_params.yarnvar_xscale = 1.f;
-    weave_params.yarnvar_yscale = 1.f;
-    weave_params.yarnvar_persistance = 1.f;
-    weave_params.yarnvar_octaves = 8.f;
+    weave_params.delta_x = 0.9f;
+    weave_params.intensity_fineness = 0.f;
+    weave_params.yarnvar_amplitude = 5.f;
+    weave_params.yarnvar_xscale = 3.f;
+    weave_params.yarnvar_yscale = 20.f;
+    weave_params.yarnvar_persistance = 0.7f;
+    weave_params.yarnvar_octaves = 4.f;
     float specular_strength = 0.3;
     // -----------------------------
 
@@ -352,8 +376,10 @@ void OptixProject::createGeometry() //------------------------------------------
     cloth_matl["wc_pattern"]->setUserData(sizeof(PatternEntry)*pattern_size,weave_params.pattern_entry);
 	
 
+	//chair material
+
 	Material chair_matl = m_context->createMaterial();
-	Program chair_ch = m_context->createProgramFromPTXFile(m_ptx_path, "floor_closest_hit_radiance");
+	Program chair_ch = m_context->createProgramFromPTXFile(m_ptx_path, "chair_closest_hit_radiance");
 	chair_matl->setClosestHitProgram(0, chair_ch);
 	
 	Program ah = m_context->createProgramFromPTXFile(m_ptx_path, "any_hit_shadow");
@@ -365,16 +391,16 @@ void OptixProject::createGeometry() //------------------------------------------
 	chair_matl["reflectivity"]->setFloat(0.1f, 0.1f, 0.1f);
 	chair_matl["reflectivity_n"]->setFloat(0.01f, 0.01f, 0.01f);
 	chair_matl["phong_exp"]->setFloat(88);
-	chair_matl["tile_v0"]->setFloat(0.25f, 0, .15f);
-	chair_matl["tile_v1"]->setFloat(-.15f, 0, 0.25f);
-	chair_matl["crack_color"]->setFloat(0.1f, 0.1f, 0.1f);
-	chair_matl["crack_width"]->setFloat(0.f);
+
+	//floor material
 
     Material floor_matl = m_context->createMaterial();
 	Program floor_ch = m_context->createProgramFromPTXFile(m_ptx_path, "only_shadows_closest_hit_radiance");
 	floor_matl->setClosestHitProgram(0, floor_ch);
 
 	floor_matl->setAnyHitProgram(1, ah);
+
+	//metal material
 
 	Material metal_matl = m_context->createMaterial();
 	Program metal_ch = m_context->createProgramFromPTXFile(m_ptx_path, "metal_closest_hit_radiance");
@@ -389,6 +415,22 @@ void OptixProject::createGeometry() //------------------------------------------
 	metal_matl["phong_exp"]->setFloat(88);
 	metal_matl["reflectivity_n"]->setFloat(0.2f, 0.2f, 0.2f);
 
+	//black material
+
+	Material black_matl = m_context->createMaterial();
+	Program black_ch = m_context->createProgramFromPTXFile(m_ptx_path, "black_closest_hit_radiance");
+	black_matl->setClosestHitProgram(0, black_ch);
+	black_matl->setAnyHitProgram(1, ah);
+
+	//epilepsy material
+
+	Material epilepsy_matl = m_context->createMaterial();
+	Program epilepsy_ch = m_context->createProgramFromPTXFile(m_ptx_path, "epilepsy_closest_hit_radiance");
+	epilepsy_matl->setClosestHitProgram(0, epilepsy_ch);
+	epilepsy_matl->setAnyHitProgram(1, ah);
+
+
+
 	// Glass material
 	
 	//if (chull.get()) {
@@ -402,7 +444,7 @@ void OptixProject::createGeometry() //------------------------------------------
 		glass_matl->setAnyHitProgram(1, glass_ah);
 
 		glass_matl["importance_cutoff"]->setFloat(1e-2f);
-		glass_matl["cutoff_color"]->setFloat(0.34f, 0.55f, 0.85f);
+		glass_matl["cutoff_color"]->setFloat(0.9f, 0.9f, 0.9f);
 		glass_matl["fresnel_exponent"]->setFloat(3.0f);
 		glass_matl["fresnel_minimum"]->setFloat(0.1f);
 		glass_matl["fresnel_maximum"]->setFloat(1.0f);
@@ -416,33 +458,46 @@ void OptixProject::createGeometry() //------------------------------------------
 		glass_matl["shadow_attenuation"]->setFloat(0.4f, 0.7f, 0.4f);
 	//}
 
+	//--------------------------------
+	//CREATING OBJECTS
+	//--------------------------------
 	geometrygroup = m_context->createGeometryGroup();
 
     struct ObjFile objs[] = {
-        {"cognacglass.obj", metal_matl, 
-            {0.5f, 0.0f, 0.0f, 0.0f,
-		    0.0f, -0.5f, 0.0f, 12.0f,
-		    0.0f, 0.0f, 0.5f, 0.0f,
-		    0.0f, 0.0f, 0.0f, 0.5f}
-        },
+		
         {"floor.obj", floor_matl, 
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
         },
+		/*
+		{ "bunny_uv.obj", glass_matl,
+			{ 10.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 10.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 10.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 10.0f }
+		},
+
+		{"cognacglass.obj", metal_matl, 
+            {0.16f, 0.0f, 0.0f, 0.0f,
+		    0.0f, 0.16f, 0.0f, 4.55f,
+		    0.0f, 0.0f, 0.16f, 0.0f,
+		    0.0f, 0.0f, 0.0f, 0.16f}
+        },
+        
         {"chair.obj", chair_matl, 
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
-        },
-        {"cloth_on_chair.obj", cloth_matl, 
+        },*/
+        {"teapot.obj", black_matl,
            {1.0f, 0.0f, 0.0f, 0.0f,
 		    0.0f, 1.0f, 0.0f, 0.0f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
-        },
+        }
     };
 
     for(int i=0;i<sizeof(objs)/sizeof(ObjFile);i++){
@@ -496,7 +551,7 @@ int main(int argc, char** argv)
 	//--------------------------------------------//
 
 	std::stringstream title;
-	title << "Nice stuff yo";
+	title << "OptiX Render";
 	try {
 		
 		OptixProject scene(texture_path);

@@ -5,6 +5,7 @@
 #define WC_PREFIX __device__
 #define WC_NO_FILES
 #include "woven_cloth.cpp"
+#include "random.h"
 
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, ); 
 rtDeclareVariable(float3, shading_normal,   attribute shading_normal, ); 
@@ -25,6 +26,15 @@ rtDeclareVariable(rtObject,     top_object, , );
 rtDeclareVariable(float3, dPdu, attribute dPdu, );
 rtDeclareVariable(float3, dPdv, attribute dPdv, );
 
+//Shadow ray variables
+rtDeclareVariable(unsigned int, shadow_samples, , );
+rtDeclareVariable(unsigned int, light_radius, , );
+
+//Anti-aliasing variables
+rtDeclareVariable(float,		jitter_factor, , );
+rtDeclareVariable(unsigned int, frame, , );
+rtBuffer<unsigned int, 2>		rnd_seeds;
+
 //
 // Pinhole camera implementation
 //
@@ -38,20 +48,34 @@ rtBuffer<uchar4, 2>              output_buffer;
 RT_PROGRAM void pinhole_camera()
 {
     size_t2 screen = output_buffer.size();
-    float2 d = make_float2(launch_index) / make_float2(screen) * 2.f - 1.f;
-    float3 ray_origin = eye;
-    float3 ray_direction = normalize(d.x*U + d.y*V + W);
+    float3 prd_result = make_float3(0.f,0.f,0.f);
+	PerRayData_radiance prd;
 
-    optix::Ray ray(ray_origin, ray_direction, radiance_ray_type, scene_epsilon);
 
-    PerRayData_radiance prd;
-    prd.ray_id = launch_index;
-    prd.importance = 1.f;
-    prd.depth = 0;
+	prd.seed = rot_seed(rnd_seeds[launch_index], frame);
 
-    rtTrace(top_object, ray, prd);
+    int num_samples = 4;
+    float inv_num_samples = 1.f/(float)num_samples;
 
-    output_buffer[launch_index] = make_color( prd.result );
+	for (int i = 0; i < num_samples; i++) {
+		float2 subpixel_jitter = make_float2(rnd(prd.seed) - 0.5f, rnd(prd.seed) - 0.5f) * jitter_factor;
+
+		float2 d = (make_float2(launch_index) + subpixel_jitter) / make_float2(screen) * 2.f - 1.f;
+		float3 ray_origin = eye;
+		float3 ray_direction = normalize(d.x*U + d.y*V + W);
+
+		optix::Ray ray(ray_origin, ray_direction, radiance_ray_type, scene_epsilon);
+
+		prd.importance = 1.f;
+		prd.depth = 0;
+
+		rtTrace(top_object, ray, prd);
+		
+		prd_result += prd.result*inv_num_samples;
+		
+	}
+
+	output_buffer[launch_index] = make_color(prd_result);
 }
 
 
@@ -107,7 +131,6 @@ rtDeclareVariable(float3,   reflectivity_n, , );
 rtDeclareVariable(float, metalKa, , ) = 1;
 rtDeclareVariable(float, metalKs, , ) = 1;
 rtDeclareVariable(float, metalroughness, , ) = .1;
-rtDeclareVariable(float3, rustcolor, , ) = {.437, .084, 0};
 rtDeclareVariable(float3, metalcolor, , ) = {.7, .7, .7};
 rtDeclareVariable(float, txtscale, , ) = .02;
 #define MAXOCTAVES 6
@@ -125,65 +148,16 @@ RT_PROGRAM void metal_closest_hit_radiance()
     float3 ffnormal     = faceforward( world_shade_normal, -ray.direction, world_geo_normal );
     float3 hit_point = ray.origin + t_hit * ray.direction;
 
-    /* Sum several octaves of abs(snoise), i.e. turbulence.  Limit the
-    * number of octaves by the estimated change in PP between adjacent
-    * shading samples.
-    */
-    float3 PP = txtscale * hit_point;
-    float a = 1;
-    float sum = 0;
-    for(int i = 0; i < MAXOCTAVES; i++ ){
-        sum += a * fabs(snoise(PP));
-        PP *= 2.0f;
-        a *= 0.5f;
-    }
-
-
-    float3 color = metalcolor * metalKa * ambient_light_color;
-    for(int i = 0; i < lights.size(); ++i) {
-        BasicLight light = lights[i];
-        float3 L = normalize(light.pos - hit_point);
-        float nmDl = dot( ffnormal, L);
-
-        if( nmDl > 0.0f){
-            // cast shadow ray
-            PerRayData_shadow shadow_prd;
-            shadow_prd.attenuation = make_float3(1.0f);
-            float Ldist = length(light.pos - hit_point);
-            optix::Ray shadow_ray( hit_point, L, shadow_ray_type, scene_epsilon, Ldist );
-            rtTrace(top_shadower, shadow_ray, shadow_prd);
-            float3 light_attenuation = shadow_prd.attenuation;
-
-            if( fmaxf(light_attenuation) > 0.0f ){
-                float3 Lc = light.color * light_attenuation;
-                color += Lc;
-
-                float r = nmDl;
-                if(nmDl > 0.0f){
-                    float3 H = normalize(L - ray.direction);
-                    float nmDh = dot( ffnormal, H );
-                    if(nmDh > 0)
-                        color += r * metalKs * Lc * pow(nmDh, 1.f/metalroughness);
-                }
-            }
-
-        }
-    }
-
-    float3 r = schlick(-dot(ffnormal, ray.direction), reflectivity_n );
-    float importance = prd_radiance.importance * optix::luminance( r );
-
+    float3 color = make_float3(0.f,0.f,0.f);
     // reflection ray
-    if( importance > importance_cutoff && prd_radiance.depth < max_depth) {
-        PerRayData_radiance refl_prd;
-        refl_prd.importance = importance;
-        refl_prd.depth = prd_radiance.depth+1;
-        float3 R = reflect( ray.direction, ffnormal );
-        optix::Ray refl_ray( hit_point, R, radiance_ray_type, scene_epsilon );
-        rtTrace(top_object, refl_ray, refl_prd);
-        color += r * refl_prd.result;
-    }
-
+	if (prd_radiance.depth < max_depth) {
+		PerRayData_radiance refl_prd;
+		refl_prd.depth = prd_radiance.depth + 1;
+		float3 R = reflect(ray.direction, ffnormal);
+		optix::Ray refl_ray(hit_point, R, radiance_ray_type, scene_epsilon);
+		rtTrace(top_object, refl_ray, refl_prd);
+		color += 0.95* refl_prd.result;
+	}
     prd_radiance.result = color;
 }
 
@@ -193,40 +167,27 @@ RT_PROGRAM void metal_closest_hit_radiance()
 // Uses procedural texture to determine diffuse response.
 //
 rtDeclareVariable(float,  phong_exp, , );
-rtDeclareVariable(float3, tile_v0, , );
-rtDeclareVariable(float3, tile_v1, , );   
-rtDeclareVariable(float3, crack_color, , );
-rtDeclareVariable(float,  crack_width, , );
 rtDeclareVariable(float3, Ka, , );
 rtDeclareVariable(float3, Ks, , );
 rtDeclareVariable(float3, Kd, , );
 
-RT_PROGRAM void floor_closest_hit_radiance()
+RT_PROGRAM void chair_closest_hit_radiance()
 {
+	
     float3 world_geo_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 world_shade_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 ffnormal     = faceforward( world_shade_normal, -ray.direction, world_geo_normal );
     float3 color = Ka * ambient_light_color;
 	
 	
-	int shadow_samples = 3;
 	float shadow_intensity = 0.3f/(float)shadow_samples;
 	unsigned int num_lights = lights.size();
 	PerRayData_shadow shadow_prd;
     
     float3 hit_point = ray.origin + t_hit * ray.direction;
 
-    float v0 = dot(tile_v0, hit_point);
-    float v1 = dot(tile_v1, hit_point);
-    v0 = v0 - floor(v0);
-    v1 = v1 - floor(v1);
-
-    float3 local_Kd;
-    if( v0 > crack_width && v1 > crack_width ){
-        local_Kd = Kd;
-    } else {
-        local_Kd = crack_color;
-    }
+    
+    
 
     for(int i = 0; i < lights.size(); ++i) {
         BasicLight light = lights[i];
@@ -234,12 +195,9 @@ RT_PROGRAM void floor_closest_hit_radiance()
         float nDl = dot( ffnormal, L);
 
 		for(int i=0;i<shadow_samples;i++){
-			float r = 2.f*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
-				(prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
-			float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
-				(prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
-			float phi   = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +2, 
-				(prd_radiance.ray_id.y*shadow_samples +i)*3 +2, 8);
+			float r = light_radius*rnd(prd_radiance.seed);
+			float theta = rnd(prd_radiance.seed)*M_2_PI;
+			float phi   = rnd(prd_radiance.seed)*M_PI;
 			float3 offset = make_float3(r*sin(theta)*sin(phi),r*cos(theta)*sin(phi),r*cos(phi));
 			float Ldist = optix::length(light.pos + offset - hit_point);
 			float3 L = optix::normalize(light.pos + offset - hit_point);
@@ -450,7 +408,6 @@ RT_PROGRAM void exception()
 
 RT_PROGRAM void only_shadows_closest_hit_radiance()
 {
-    int shadow_samples = 3;
     float shadow_intensity = 0.3f/(float)shadow_samples;
     float3 color = bg_color;
     float3 hit_point = ray.origin + t_hit * ray.direction;
@@ -458,12 +415,9 @@ RT_PROGRAM void only_shadows_closest_hit_radiance()
     for(int i = 0; i < num_lights; ++i) {
         BasicLight light = lights[i];
         for(int i=0;i<shadow_samples;i++){
-            float r = 2.f*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
-            float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
-            float phi   = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +2, 
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +2, 8);
+            float r = light_radius*rnd(prd_radiance.seed);
+			float theta = rnd(prd_radiance.seed)*M_2_PI;
+			float phi   = rnd(prd_radiance.seed)*M_PI;
             float3 offset = make_float3(r*sin(theta)*sin(phi),r*cos(theta)*sin(phi),r*cos(phi));
             float Ldist = optix::length(light.pos + offset - hit_point);
             float3 L = optix::normalize(light.pos + offset - hit_point);
@@ -482,6 +436,16 @@ RT_PROGRAM void only_shadows_closest_hit_radiance()
     prd_radiance.result = color;
 }
 
+// ------------- Black surface ----------------
+
+RT_PROGRAM void black_closest_hit_radiance()
+{
+	float3 color = { 0.f, 0.f, 0.f };
+
+	prd_radiance.result = color;
+}
+
+
 // ------------- Woven Cloth ----------------
 
 rtDeclareVariable(wcWeaveParameters, wc_parameters, , );
@@ -498,8 +462,11 @@ RT_PROGRAM void cloth_closest_hit_radiance()
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 p_normal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
-    float3 u_vec = normalize( rtTransformVector( RT_OBJECT_TO_WORLD, dPdu));
-    float3 v_vec = normalize( rtTransformVector( RT_OBJECT_TO_WORLD, dPdv));
+    float3 tmp_u = normalize( rtTransformVector( RT_OBJECT_TO_WORLD, dPdu));
+    float3 tmp_v = normalize( rtTransformVector( RT_OBJECT_TO_WORLD, dPdv));
+
+    float3 u_vec = cross(tmp_v,p_normal);
+    float3 v_vec = cross(p_normal,u_vec);
 
     wcIntersectionData intersection;
     intersection.uv_x = texcoord.x;
@@ -510,7 +477,6 @@ RT_PROGRAM void cloth_closest_hit_radiance()
 
 	
     PerRayData_shadow shadow_prd;
-	int shadow_samples = 3;
 	float shadow_intensity = 0.3f/(float)shadow_samples;
 
     unsigned int num_lights = lights.size();
@@ -525,12 +491,9 @@ RT_PROGRAM void cloth_closest_hit_radiance()
         intersection.wi_z = optix::dot(L, p_normal);
 
         for(int i=0;i<shadow_samples;i++){
-            float r = 2.f*sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +0,
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +0, 8);
-            float theta = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +1,
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +1, 8);
-            float phi   = sampleTEASingle((prd_radiance.ray_id.x*shadow_samples +i)*3 +2, 
-                (prd_radiance.ray_id.y*shadow_samples +i)*3 +2, 8);
+            float r = light_radius*rnd(prd_radiance.seed);
+			float theta = rnd(prd_radiance.seed)*M_2_PI;
+			float phi   = rnd(prd_radiance.seed)*M_PI;
             float3 offset = make_float3(r*sin(theta)*sin(phi),r*cos(theta)*sin(phi),r*cos(phi));
             float Ldist = optix::length(light.pos + offset - hit_point);
             float3 L = optix::normalize(light.pos + offset - hit_point);
@@ -562,3 +525,35 @@ RT_PROGRAM void cloth_closest_hit_radiance()
     prd_radiance.result = color;
 }
 
+// ------------- Epilepsy ----------------
+RT_PROGRAM void epilepsy_closest_hit_radiance()
+{
+	{
+		float shadow_intensity = 0.3f / (float)shadow_samples;
+		float3 color;
+		float3 hit_point = ray.origin + t_hit * ray.direction;
+		unsigned int num_lights = lights.size();
+		for (int i = 0; i < num_lights; ++i) {
+			BasicLight light = lights[i];
+			for (int i = 0; i<shadow_samples; i++){
+				float r = light_radius*rnd(prd_radiance.seed);
+				float theta = rnd(prd_radiance.seed)*M_2_PI;
+				float phi = rnd(prd_radiance.seed)*M_PI;
+				float3 offset = make_float3(r*sin(theta)*sin(phi), r*cos(theta)*sin(phi), r*cos(phi));
+				float Ldist = optix::length(light.pos + offset - hit_point);
+				float3 L = optix::normalize(light.pos + offset - hit_point);
+
+				// cast shadow ray
+				if (light.casts_shadow) {
+					PerRayData_shadow shadow_prd;
+					shadow_prd.attenuation = make_float3(1.0f);
+					optix::Ray shadow_ray = optix::make_Ray(hit_point, L, shadow_ray_type, scene_epsilon, Ldist);
+					rtTrace(top_shadower, shadow_ray, shadow_prd);
+					color = shadow_prd.attenuation*shadow_intensity*color + (1.f - shadow_intensity)*color;
+				}
+			}
+		}
+
+		prd_radiance.result = color;
+	}
+}
