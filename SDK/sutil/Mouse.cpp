@@ -710,48 +710,59 @@ void PinholeCamera::rotateTheta(float rotation) {
 }
 
 void PinholeCamera::rotatePhi(float rotation) {
-	rotation = -rotation;
-	float3 axisToRotateAround = { -(eye - lookat).z, 0.0f, (eye - lookat).x };
-	axisToRotateAround = normalize(axisToRotateAround);
 	float4 eye4 = make_float4(eye);
+	float3 lookvec = getLookVector();
 	float data[16];
-	data[0] = 1 + (1 - cosf(rotation))*(axisToRotateAround.x*axisToRotateAround.x - 1);
-	data[1] = -axisToRotateAround.z*sinf(rotation);
-	data[2] = 0.0f;
+	data[0] = 1.0f/sqrtf(powf(lookvec.z/lookvec.x, 2) + 1);
+	data[1] = 0.0f;
+	data[2] = lookvec.z/(lookvec.x*sqrtf(powf(lookvec.z/lookvec.x, 2)+1));
 	data[3] = 0.0f;
-	data[4] = axisToRotateAround.z*sinf(rotation);
-	data[5] = 1.0f + (cosf(rotation) - 1.0f);
-	data[6] = -axisToRotateAround.x*sinf(rotation);
+	data[4] = 0.0f;
+	data[5] = 1.0f;
+	data[6] = 0.0f;
 	data[7] = 0.0f;
-	data[8] = (1.0f - cosf(rotation))*axisToRotateAround.x*axisToRotateAround.z;
-	data[9] = axisToRotateAround.x*sinf(rotation);
-	data[10] = 1.0f + (1.0f - cosf(rotation))*(axisToRotateAround.z*axisToRotateAround.z - 1.0f);
+	data[8] = -lookvec.z / (lookvec.x*sqrtf(powf(lookvec.z / lookvec.x, 2) + 1));
+	data[9] = 0.0f;
+	data[10] = 1.0f / sqrtf(powf(lookvec.z / lookvec.x, 2) + 1);
 	data[11] = 0.0f;
 	data[12] = 0.0f;
 	data[13] = 0.0f;
 	data[14] = 0.0f;
 	data[15] = 1.0f;
-	const Matrix4x4 trans = makeTransform2(Matrix4x4(data), LookAt);
-	float3 newEye = make_float3(trans*eye4);
 
-	// Because of a bug causing our program to zoom in, we have added this bit to zoom out again. 
-	// An ugly fix but it works for the time being. 
+	float data2[16];
+	data2[0] = cosf(rotation);
+	data2[1] = sinf(rotation);
+	data2[2] = 0.0f;
+	data2[3] = 0.0f;
+	data2[4] = -sinf(rotation);
+	data2[5] = cosf(rotation);
+	data2[6] = 0.0f;
+	data2[7] = 0.0f;
+	data2[8] = 0.0f;
+	data2[9] = 0.0f;
+	data2[10] = 1.0f;
+	data2[11] = 0.0f;
+	data2[12] = 0.0f;
+	data2[13] = 0.0f;
+	data2[14] = 0.0f;
+	data2[15] = 1.0f;
+
+	const Matrix4x4 thetaRot = makeTransform2(Matrix4x4(data), LookAt);
+	const Matrix4x4 phiRot = makeTransform2(Matrix4x4(data2), LookAt);
+
+	float3 newEye = make_float3(inverse(thetaRot)*phiRot*thetaRot*eye4);
+	if (abs(dot(normalize(newEye - lookat), { 0.0f, 1.0f, 0.0f })) < 0.99f){
+		eye = newEye;
+	}
 	float3 distvec = eye - lookat;
 	float dist = sqrtf(distvec.x*distvec.x + distvec.y*distvec.y + distvec.z*distvec.z);
 	float3 newDistvec = newEye - lookat;
 	float newDist = sqrtf(newDistvec.x*newDistvec.x + newDistvec.y*newDistvec.y + newDistvec.z*newDistvec.z);
 	if (dist - newDist != 0.0f) {
-		Matrix4x4 trans3 = makeTransform2((dist / newDist)*Matrix4x4::identity(), LookAt);
-		eye4 = make_float4(newEye);
-		newEye = make_float3(trans3*eye4);
+		printf("ZOOM: %f\n", dist - newDist);
 	}
-	// The code to fix the zooming ends here. 
 
-	float3 y_vec = { 0.0f, 1.0f, 0.0f };
-	// Makes sure that the phi-angle doesn't get too close to zero. 
-	if (abs(dot(normalize(newEye - lookat), y_vec)) < 0.99f){
-		eye = newEye;
-	}
 	setup();
 }
 
