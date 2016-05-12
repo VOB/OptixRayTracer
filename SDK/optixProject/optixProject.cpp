@@ -153,13 +153,13 @@ void OptixProject::initScene(InitialCameraData& camera_data)
 	camera_data = 
 		
 		//CAMERA POS
-		InitialCameraData(make_float3(2.75f, 5.4f, -3.8f), // eye - material test
+		InitialCameraData(make_float3(1.5f, 5.5f, 1.5f), // eye - material test
 		//InitialCameraData(make_float3(7.17477f, 1.58335f, 1.67067f), // eye - zoomed out shadow test
 		//InitialCameraData(make_float3(3.72449f, 0.184227f, 1.06495f), // eye - zoomed in shadow test
 		//InitialCameraData(make_float3(9.0f, 10.0f, -2.0f), // eye - full scene
 		
 		//LOOKAT
-		make_float3(0.0f, 1.0f, 0.0f), // lookat
+		make_float3(0.0f, 4.0f, 0.0f), // lookat
 		//make_float3(2.57046f, -0.564597f, 1.23139f), // lookat - shadow test
 
 		make_float3(0.0f, 1.0f, 0.0f), // up
@@ -352,8 +352,8 @@ void OptixProject::createGeometry() //------------------------------------------
     // --- Woven Cloth parameters --
     char *weave_pattern_filename = "nordvalla.weave";
 
-	weave_params.uscale = 500.f;
-	weave_params.vscale = 500.f;
+	weave_params.uscale = 300.f;
+	weave_params.vscale = 300.f;
 	weave_params.umax   = 0.5f;
 	weave_params.psi    = 0.3f;
     weave_params.alpha = 0.3f;
@@ -492,12 +492,18 @@ void OptixProject::createGeometry() //------------------------------------------
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
         },*/
-        {"teapot.obj", black_matl,
+        {"woodweave.obj", black_matl,
            {1.0f, 0.0f, 0.0f, 0.0f,
-		    0.0f, 1.0f, 0.0f, 0.0f,
+		    0.0f, 1.0f, 0.0f, 5.5f,
 		    0.0f, 0.0f, 1.0f, 0.0f,
 		    0.0f, 0.0f, 0.0f, 1.0f}
-        }
+        },
+		{ "steellegs.obj", metal_matl,
+		   {1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 5.5f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f }
+		},
     };
 
     for(int i=0;i<sizeof(objs)/sizeof(ObjFile);i++){
