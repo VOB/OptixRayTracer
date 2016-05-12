@@ -415,14 +415,13 @@ void Mouse::intPosToFloatPos(int x, int y, float &xpos, float& ypos)
 
 void Mouse::rotate(int x, int y)
 {
-
 	float xpos, ypos;
 	intPosToFloatPos(x, y, xpos, ypos);
 
 	if (current_interaction.state == GLUT_DOWN) {
-		current_interaction.rotate_from.x = xpos;
-		current_interaction.rotate_from.y = ypos;
-		current_interaction.rotate_from.z = 0.8f;
+        current_interaction.rotate_from.x = xpos;
+        current_interaction.rotate_from.y = ypos;
+        current_interaction.rotate_from.z = 0.8f;
 
 	}
 	else if (current_interaction.state == GLUT_MOTION) {
@@ -664,7 +663,7 @@ Matrix4x4 PinholeCamera::makeTransform2(const Matrix4x4& trans, TransformCenter 
 	return final_trans;
 }
 
-void PinholeCamera::transform(const Matrix4x4& trans, TransformCenter transCenter)
+void PinholeCamera::transform( const Matrix4x4& trans, TransformCenter transCenter )
 {
 
 	const Matrix4x4 final_trans = makeTransform(trans, transCenter);
@@ -710,48 +709,49 @@ void PinholeCamera::rotateTheta(float rotation) {
 }
 
 void PinholeCamera::rotatePhi(float rotation) {
-	rotation = -rotation;
-	float3 axisToRotateAround = { -(eye - lookat).z, 0.0f, (eye - lookat).x };
-	axisToRotateAround = normalize(axisToRotateAround);
 	float4 eye4 = make_float4(eye);
-	float data[16];
-	data[0] = 1 + (1 - cosf(rotation))*(axisToRotateAround.x*axisToRotateAround.x - 1);
-	data[1] = -axisToRotateAround.z*sinf(rotation);
-	data[2] = 0.0f;
-	data[3] = 0.0f;
-	data[4] = axisToRotateAround.z*sinf(rotation);
-	data[5] = 1.0f + (cosf(rotation) - 1.0f);
-	data[6] = -axisToRotateAround.x*sinf(rotation);
-	data[7] = 0.0f;
-	data[8] = (1.0f - cosf(rotation))*axisToRotateAround.x*axisToRotateAround.z;
-	data[9] = axisToRotateAround.x*sinf(rotation);
-	data[10] = 1.0f + (1.0f - cosf(rotation))*(axisToRotateAround.z*axisToRotateAround.z - 1.0f);
-	data[11] = 0.0f;
-	data[12] = 0.0f;
-	data[13] = 0.0f;
-	data[14] = 0.0f;
-	data[15] = 1.0f;
-	const Matrix4x4 trans = makeTransform2(Matrix4x4(data), LookAt);
-	float3 newEye = make_float3(trans*eye4);
+	float3 lookvec = normalize(getLookVector());
+	
+	Matrix4x4 thetaRot = Matrix4x4::identity();
+	if (lookvec.x == 0) {
+		thetaRot[2] = lookvec.z / abs(lookvec.z);
+		thetaRot[8] = -lookvec.z / abs(lookvec.z);
+	}
+	else{
+		float tanfix = 1.0f;
+		if (lookvec.x < 0) {
+			tanfix = -1.0f;
+		}
+		thetaRot[0] = 1.0f / sqrtf(powf(lookvec.z / lookvec.x, 2) + 1)*tanfix;
+		thetaRot[2] = lookvec.z / (lookvec.x*sqrtf(powf(lookvec.z / lookvec.x, 2) + 1))*tanfix;
+		thetaRot[8] = -lookvec.z / (lookvec.x*sqrtf(powf(lookvec.z / lookvec.x, 2) + 1))*tanfix;
+		thetaRot[10] = 1.0f / sqrtf(powf(lookvec.z / lookvec.x, 2) + 1)*tanfix;
+	}
+	Matrix4x4 phiRot = Matrix4x4::identity();
+	phiRot[0] = cosf(rotation);
+	phiRot[1] = -sinf(rotation);
+	phiRot[4] = sinf(rotation);
+	phiRot[5] = cosf(rotation);
 
-	// Because of a bug causing our program to zoom in, we have added this bit to zoom out again. 
-	// An ugly fix but it works for the time being. 
+	thetaRot = makeTransform2(thetaRot, LookAt);
+	phiRot = makeTransform2(phiRot, LookAt);
+	
+	float3 newEye = make_float3(inverse(thetaRot)*phiRot*thetaRot*eye4);
 	float3 distvec = eye - lookat;
 	float dist = sqrtf(distvec.x*distvec.x + distvec.y*distvec.y + distvec.z*distvec.z);
 	float3 newDistvec = newEye - lookat;
 	float newDist = sqrtf(newDistvec.x*newDistvec.x + newDistvec.y*newDistvec.y + newDistvec.z*newDistvec.z);
 	if (dist - newDist != 0.0f) {
-		Matrix4x4 trans3 = makeTransform2((dist / newDist)*Matrix4x4::identity(), LookAt);
+		Matrix4x4 zoomTransformation = makeTransform2((dist / newDist)*Matrix4x4::identity(), LookAt);
 		eye4 = make_float4(newEye);
-		newEye = make_float3(trans3*eye4);
+		newEye = make_float3(zoomTransformation*eye4);
 	}
-	// The code to fix the zooming ends here. 
-
-	float3 y_vec = { 0.0f, 1.0f, 0.0f };
-	// Makes sure that the phi-angle doesn't get too close to zero. 
-	if (abs(dot(normalize(newEye - lookat), y_vec)) < 0.99f){
+	
+	if (abs(dot(normalize(newEye - lookat), { 0.0f, 1.0f, 0.0f })) < 0.99f){
 		eye = newEye;
 	}
+	
+
 	setup();
 }
 
